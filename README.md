@@ -1,6 +1,4 @@
 # redlined_by_algorithm
-CatDGomez's capstone project for the Data Science Cohort 9 at Nashville Software School
-
 This project analyzes Home Mortgage Disclosure Act data to detect potential discrimination by race and other protected classes. 
 
 ### Goal: 
