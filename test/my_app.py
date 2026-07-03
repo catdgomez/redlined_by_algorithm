@@ -179,4 +179,15 @@ for var, label in all_ethnicity.items():
 st.sidebar.markdown("---")
 
 
+# ── Racial group selection ──────────────────────────────────────────────────────
+st.sidebar.subheader("Which racial groups do you want to include?")
+st.sidebar.markdown(f"Each group is compared to **{race_baseline_label}**.")
 
+selected_race_vars = []
+for var, label in all_race.items():
+    if var == race_baseline_var:
+        continue
+    if st.sidebar.checkbox(label, value=True, key=f"race_{var}"):
+        selected_race_vars.append(var)
+
+st.sidebar.markdown("---")
