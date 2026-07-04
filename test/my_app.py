@@ -231,13 +231,13 @@ include_age_section = st.sidebar.checkbox(
 )
 
 selected_age_vars = []
-age_baseline_label = "35-44"
+age_baseline_label = "25-34"
 
 if include_age_section:
     age_baseline_label = st.sidebar.selectbox(
         "Age baseline (comparison group)",
         options=list(age_baseline_options.keys()),
-        index=list(age_baseline_options.keys()).index("35-44"),
+        index=list(age_baseline_options.keys()).index("25-34"),
         help="All other age groups will be compared to this age group"
     )
     age_baseline_var = age_baseline_options[age_baseline_label]
@@ -260,6 +260,48 @@ if include_age_section:
         selected_age_vars.append("applicant_age_above_62")
 
 st.sidebar.markdown("---")
+
+
+# ── Control variable checkboxes ──────────────────────────────────────────────────
+st.sidebar.subheader("Which financial factors would you like to account for?")
+st.sidebar.markdown("""
+Checking these boxes means you're comparing people who look **financially similar** on these measures. 
+The more boxes you check, the more you're isolating the demographic factor(s) being examined.
+""")
+
+include_income         = st.sidebar.checkbox("Income", value=True,
+                                              help="The applicant's reported income")
+include_dti            = st.sidebar.checkbox("Debt-to-Income Ratio", value=True,
+                                              help="How much of their income goes toward debt payments each month")
+include_ltv            = st.sidebar.checkbox("Loan-to-Value Ratio", value=True,
+                                              help="How much they're borrowing compared to what the home is worth")
+include_tract_minority = st.sidebar.checkbox("Neighborhood Racial Composition", value=False,
+                                              help="The percentage of minority residents in the neighborhood where the home is located")
+include_loan_amount    = st.sidebar.checkbox("Loan Amount", value=False,
+                                              help="The amount of the covered loan, or the amount applied for")
+include_property_value = st.sidebar.checkbox("Property Value", value=False,
+                                              help="The value of the property securing the covered loan")
+include_loan_type      = st.sidebar.checkbox("Loan Type (FHA / VA / Conventional)", value=False,
+                                              help="""Federal Housing Administration (FHA), U.S. Department of Veterans Affairs (VA), and Conventional loans. 
+                                              Turn this OFF to see the full picture. Some groups are steered toward loan types that are harder to get 
+                                              approved for""")
+include_loan_purpose   = st.sidebar.checkbox("Loan Purpose", value=False,
+                                              help="Whether the loan is for buying a home, refinancing, etc.")
+include_lien_status    = st.sidebar.checkbox("Lien Status", value=False,
+                                              help="Whether this is a first or second mortgage")
+include_open_end       = st.sidebar.checkbox("Open-End Line of Credit (", value=False,
+                                              help="Open-end lines of credit or Home Equity Lines of Credit (HELOCs)")
+include_occupancy      = st.sidebar.checkbox("Occupancy Type", value=False,
+                                              help="Whether the home is a primary residence, second home, or investment property")
+
+st.sidebar.markdown("---")
+st.sidebar.markdown(f"""
+**Current comparison groups:**  \n
+Ethnicity --> compared to **{eth_baseline_label}** \n
+Race --> compared to **{race_baseline_label}** \n
+Age --> compared to **{age_baseline_label}** \n 
+**Gender** --> I have chosen to exclude gender from this analysis because, in this data, gender had high mismatch rates between self-reported and lender-observed gender fields. This made reliable interpretation impossible without further investigation. 
+""")
 
 # ── Expanders ─────────────────────────────────────────────────────────────────
 st.markdown("---")
@@ -312,7 +354,7 @@ with st.expander("What do the loan filters mean?"):
     **Reverse mortgages** is a special type of loan where older homeowners borrow against the equity 
     in their home. Very different from regular mortgages.
 
-    **Open-end lines of credit or Home Equity Line of Credits (HELOCs)** are like a credit card 
+    **Open-end lines of credit or Home Equity Lines of Credit (HELOCs)** are like a credit card 
     secured by your home. Very different from a standard mortgage loan.
 
     **Business or commercial purpose loans** are loans taken out by businesses or investors rather 
