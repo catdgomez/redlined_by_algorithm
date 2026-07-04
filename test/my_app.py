@@ -145,7 +145,17 @@ filter_primary_residence = st.sidebar.checkbox(
     value=False,
     help="Excludes second homes and investment properties. Focusing on primary residences zeroes in on people trying to buy the home they actually live in."
 )
-
+filter_lien_status = st.sidebar.checkbox(
+    "Only include primary mortgages",
+    value=False,
+    help="Excludes a subordinated lien which means there is already another loan on the home that gets paid first if the borrower defaults."
+)
+filter_conventional_loan_type = st.sidebar.checkbox(
+    "Only include conventional mortgages",
+    value=False,
+    help="""Excludes loans insured or guaranteed by Federal Housing Administration (FHA), Veterans Affairs (VA), USDA Rural Housing Service (RHS), or Farm 
+    Service Agency (FSA)."""
+)
 st.sidebar.markdown("---")
 
 
@@ -277,22 +287,10 @@ include_ltv            = st.sidebar.checkbox("Loan-to-Value Ratio", value=True,
                                               help="How much they're borrowing compared to what the home is worth")
 include_tract_minority = st.sidebar.checkbox("Neighborhood Racial Composition", value=False,
                                               help="The percentage of minority residents in the neighborhood where the home is located")
-include_loan_amount    = st.sidebar.checkbox("Loan Amount", value=False,
+include_loan_amount    = st.sidebar.checkbox("Loan Amount Scaled", value=False,
                                               help="The amount of the covered loan, or the amount applied for")
-include_property_value = st.sidebar.checkbox("Property Value", value=False,
+include_property_value = st.sidebar.checkbox("Property Value Scaled", value=False,
                                               help="The value of the property securing the covered loan")
-include_loan_type      = st.sidebar.checkbox("Loan Type (FHA / VA / Conventional)", value=False,
-                                              help="""Federal Housing Administration (FHA), U.S. Department of Veterans Affairs (VA), and Conventional loans. 
-                                              Turn this OFF to see the full picture. Some groups are steered toward loan types that are harder to get 
-                                              approved for""")
-include_loan_purpose   = st.sidebar.checkbox("Loan Purpose", value=False,
-                                              help="Whether the loan is for buying a home, refinancing, etc.")
-include_lien_status    = st.sidebar.checkbox("Lien Status", value=False,
-                                              help="Whether this is a first or second mortgage")
-include_open_end       = st.sidebar.checkbox("Open-End Line of Credit (", value=False,
-                                              help="Open-end lines of credit or Home Equity Lines of Credit (HELOCs)")
-include_occupancy      = st.sidebar.checkbox("Occupancy Type", value=False,
-                                              help="Whether the home is a primary residence, second home, or investment property")
 
 st.sidebar.markdown("---")
 st.sidebar.markdown(f"""
@@ -302,6 +300,31 @@ Race --> compared to **{race_baseline_label}** \n
 Age --> compared to **{age_baseline_label}** \n 
 **Gender** --> I have chosen to exclude gender from this analysis because, in this data, gender had high mismatch rates between self-reported and lender-observed gender fields. This made reliable interpretation impossible without further investigation. 
 """)
+
+
+# ── Apply dataset filters ─────────────────────────────────────────────────────
+st.sidebar.markdown("---")
+
+df = df_raw.copy()
+
+if filter_reverse and 'reverse_mortgage' in df.columns:
+    df = df[df['reverse_mortgage'] == 2]
+if filter_open_end and 'open_end_line_of_credit' in df.columns:
+    df = df[df['open_end_line_of_credit'] == 2]
+if filter_business and 'business_or_commercial_purpose' in df.columns:
+    df = df[df['business_or_commercial_purpose'] == 2]
+if filter_single_family and 'total_units' in df.columns:
+    df = df[df['total_units'] == 1]
+if filter_home_purchase and 'loan_purpose' in df.columns:
+    df = df[df['loan_purpose'] == 1]
+if filter_primary_residence and 'occupancy_type' in df.columns:
+    df = df[df['occupancy_type'] == 1]
+if filter_lien_status and 'lien_status' in df.columns:
+    df = df[df['lien_status'] == 1]
+if filter_conventional_loan_type and 'loan_type' in df.columns:
+    df = df[df['loan_type'] == 1]    
+st.sidebar.markdown("---")
+    
 
 # ── Expanders ─────────────────────────────────────────────────────────────────
 st.markdown("---")
@@ -365,6 +388,14 @@ with st.expander("What do the loan filters mean?"):
     **Home purchase only** will exclude refinancing and home improvement loans.
 
     **Primary residences only** excludes second homes and investment properties.
+
+    **Primary mortgage loan purpose** will exclude refinancing, home improvement loans, etc.
+    
+    **Primary mortgage lien status** will exclude a subordinated lien which means there is already another loan on the home that gets paid first if the borrower defaults.
+
+    **Primary residences only** excludes second homes and investment properties.
+
+    **Conventional loan only** excludes loans insured or guaranteed by Federal Housing Administration (FHA), Veterans Affairs (VA), USDA Rural Housing Service (RHS), or Farm Service Agency (FSA).
     """)
 
 with st.expander("Why does this matter?"):
