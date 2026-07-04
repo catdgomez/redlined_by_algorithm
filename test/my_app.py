@@ -23,16 +23,17 @@ st.set_page_config(
 
 # ── Title & intro ─────────────────────────────────────────────────────────────
 st.title("🏠 Redlined by Algorithm")
-st.subheader("Does race or ethnicity affect your chances of getting a mortgage in Atlanta?")
-st.markdown("""
-This tool looks at real mortgage application data from Atlanta, GA to explore a simple question:
+st.subheader("Does race, ethnicity, or age affect your chances of getting a mortgage in Atlanta?")
+with st.expander("Why are we here?"):
+    st.markdown("""
+    This tool looks at real mortgage application data from Atlanta, GA to explore a simple question:
 
-**After accounting for financial factors like income and debt, does a person's race, ethnicity, 
-gender, or age still affect whether their mortgage application gets approved?**
+    **After accounting for financial factors like income and debt, does a person's race, ethnicity, 
+    or age still affect whether their mortgage application gets approved?**
 
-Use the sidebar to choose which groups to compare, which financial factors to account for, 
-and which types of loans to include. The chart will update instantly.
-""")
+    Use the sidebar to choose which groups to compare, which financial factors to account for, 
+    and which types of loans to include. The chart will update instantly.
+    """)
 
 with st.expander("How does this work?"):
     st.markdown("""
@@ -68,6 +69,7 @@ all_ethnicity = {
     "ae_values_13": "Cuban",
     "ae_values_14": "Other Hispanic or Latino",
     "ae_values_2":  "Not Hispanic or Latino",
+    "is_hispanic":  "Any Hispanic or Latino (combined)",
 }
 
 all_race = {
@@ -89,6 +91,17 @@ all_race = {
     "ar_values_44": "Other Pacific Islander",
 }
 
+# hmda age bins --> baseline will be selected by app user
+all_age = {
+    "applicant_age_lt25":  "Under 25",
+    "applicant_age_25_34": "25-34",
+    "applicant_age_35_44": "35-44",
+    "applicant_age_45_54": "45-54",
+    "applicant_age_55_64": "55-64",
+    "applicant_age_65_74": "65-74",
+    "applicant_age_gt74":  "Over 74",
+}
+
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 st.sidebar.header("Build Your Analysis Here")
@@ -105,7 +118,7 @@ Each one removes certain applications from the analysis entirely.
 filter_reverse = st.sidebar.checkbox(
     "Exclude reverse mortgages",
     value=False,
-    help="Reverse mortgages work differently from regular home loans. Older homeowners borrow against equity they already have. Excluding them makes the comparison more apples-to-apples."
+    help="A reverse mortgage is when a homeowner, (usually older), borrows money using their home as collateral, and the bank pays them instead of the other way around. These work so differently from a regular home purchase loan that including them can muddy the results."
 )
 filter_open_end = st.sidebar.checkbox(
     "Exclude open-end lines of credit (HELOCs)",
@@ -145,6 +158,7 @@ All approval odds in the chart are shown relative to this group.
 
 eth_baseline_options  = {v: k for k, v in all_ethnicity.items()}
 race_baseline_options = {v: k for k, v in all_race.items()}
+age_baseline_options  = {v: k for k, v in all_age.items()}
 
 eth_baseline_label = st.sidebar.selectbox(
     "Ethnic identity baseline",
@@ -162,6 +176,14 @@ race_baseline_label = st.sidebar.selectbox(
 )
 race_baseline_var = race_baseline_options[race_baseline_label]
 
+age_baseline_label = st.sidebar.selectbox(
+    "Age identity baseline",
+    options=list(age_baseline_options.keys()),
+    index=list(age_baseline_options.keys()).index("35-44"),
+    help="All age groups will be compared to this group"
+)
+age_baseline_var = age_baseline_options[age_baseline_label]
+
 st.sidebar.markdown("---")
 
 
@@ -173,7 +195,7 @@ selected_eth_vars = []
 for var, label in all_ethnicity.items():
     if var == eth_baseline_var:
         continue
-    if st.sidebar.checkbox(label, value=True, key=f"eth_{var}"):
+    if st.sidebar.checkbox(label, value=False, key=f"eth_{var}"):
         selected_eth_vars.append(var)
 
 st.sidebar.markdown("---")
@@ -187,7 +209,56 @@ selected_race_vars = []
 for var, label in all_race.items():
     if var == race_baseline_var:
         continue
-    if st.sidebar.checkbox(label, value=True, key=f"race_{var}"):
+    if st.sidebar.checkbox(label, value=False, key=f"race_{var}"):
         selected_race_vars.append(var)
 
 st.sidebar.markdown("---")
+
+
+# ── Age group selection ─────────────────────────────────────────────────
+st.sidebar.subheader("Which age groups do you want to include?")
+st.sidebar.markdown(f"Each group is compared to **{age_baseline_label}**.")
+
+# ── Age group selection ───────────────────────────────────────────────────────
+st.sidebar.subheader("Age groups")
+st.sidebar.markdown("""
+Age is a protected class under the Equal Credit Opportunity Act.
+""")
+
+include_age_section = st.sidebar.checkbox(
+    "Include age in the analysis", value=False,
+    help="Add age as a demographic variable to examine"
+)
+
+selected_age_vars = []
+age_baseline_label = "35-44"
+
+if include_age_section:
+    age_baseline_label = st.sidebar.selectbox(
+        "Age baseline (comparison group)",
+        options=list(age_baseline_options.keys()),
+        index=list(age_baseline_options.keys()).index("35-44"),
+        help="All other age groups will be compared to this age group"
+    )
+    age_baseline_var = age_baseline_options[age_baseline_label]
+
+    st.sidebar.markdown(f"Each age group is compared to **{age_baseline_label}**.")
+
+    also_include_62_flag = st.sidebar.checkbox(
+        "Also include Age 62+ as a single indicator",
+        value=False,
+        help="Adds a simple yes or no flag for whether the applicant is 62 or older, in addition to the age bins"
+    )
+
+    for var, label in all_age.items():
+        if var == age_baseline_var:
+            continue
+        if st.sidebar.checkbox(label, value=False, key=f"age_{var}"):
+            selected_age_vars.append(var)
+
+    if also_include_62_flag:
+        selected_age_vars.append("applicant_age_above_62")
+
+st.sidebar.markdown("---")
+
+
