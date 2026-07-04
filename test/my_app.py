@@ -1,6 +1,6 @@
 """
 Redlined by Algorithm: Interactive Fair Lending Analysis
-HMDA Mortgage Data - Atlanta, Georgia
+Home Mortgage Disclosure Act (HMDA) Mortgage Data from Atlanta, Georgia
 """
 
 
@@ -261,4 +261,84 @@ if include_age_section:
 
 st.sidebar.markdown("---")
 
+# ── Expanders ─────────────────────────────────────────────────────────────────
+st.markdown("---")
+with st.expander("How to read this chart"):
+    st.markdown("""
+    **The dot** shows the approval odds for that group compared to the baseline group you selected.
+
+    **The line** through the dot is the uncertainty range. Sort of like a margin of error. 
+    A wider line means we have less certainty because there are fewer people in that group.
+
+    **The dashed line** is the "no difference" mark. 
+    - If the dot is to the **left**, that group has **lower** approval odds than the baseline
+    - If the dot is to the **right**, that group has **higher** approval odds than the baseline
+    - If the line **crosses** the dashed line, the difference might just be random chance
+
+    **Red bars** mean the difference is large enough that we're confident it's real, not just noise.
+
+    **Colors by group type:**
+    - 🔵 Blue = Ethnicity groups
+    - 🟢 Green = Race groups
+    - 🟠 Orange = Age groups
+    - 🔴 Red = Statistically significant (any type)
+
+    **Try switching the baseline group** in the sidebar to see the data from a different perspective.
+
+    **Try unchecking financial factors** and you might see the disparities get larger, 
+    which suggests those factors were masking some of the gap.
+
+    **Try toggling the loan filters** and narrowing to just home purchases or single-family homes 
+    may sharpen or change the patterns you see.
+    """)
+
+with st.expander("A note on age in this data"):
+    st.markdown("""
+    Home Mortgage Disclosure Act (HMDA) reports age in bins rather than exact ages:
+    -->  Under 25, 25-34, 35-44, 45-54, 55-64, 65-74, Over 74
+
+    There is also an **Age 62+ flag** which is a simple yes or no used in fair lending analysis 
+    because reverse mortgages (which work very differently from standard mortgages) are 
+    only available to homeowners 62 and older.
+
+    Under the **Equal Credit Opportunity Act**, lenders cannot discriminate based on age 
+    (specifically protecting applicants 40 and older). If older applicants show lower 
+    approval odds than younger applicants after controlling for financial factors, 
+    that's worth investigating.
+    """)
+
+with st.expander("What do the loan filters mean?"):
+    st.markdown("""
+    **Reverse mortgages** is a special type of loan where older homeowners borrow against the equity 
+    in their home. Very different from regular mortgages.
+
+    **Open-end lines of credit or Home Equity Line of Credits (HELOCs)** are like a credit card 
+    secured by your home. Very different from a standard mortgage loan.
+
+    **Business or commercial purpose loans** are loans taken out by businesses or investors rather 
+    than individual homebuyers.
+
+    **Single-family homes only** will limit the analysis to houses with one unit.
+
+    **Home purchase only** will exclude refinancing and home improvement loans.
+
+    **Primary residences only** excludes second homes and investment properties.
+    """)
+
+with st.expander("Why does this matter?"):
+    st.markdown("""
+    Federal law, specifically the __**Equal Credit Opportunity Act**__, says lenders cannot discriminate 
+    based on race, color, religion, national origin, sex, marital status, or age.
+
+    But discrimination doesn't always look obvious. Sometimes it shows up in patterns across thousands 
+    of decisions where one group consistently gets worse outcomes even when their finances look the same.
+
+    That's what this tool helps you see. It's simliar to the kind of analysis that bank regulators and 
+    civil rights lawyers use to investigate fair lending violations.
+
+    **This data is from 2020-2024, covers the Atlanta metro area, and comes from the Home Mortgage 
+    Disclosure Act (HMDA) which is a federal database that lenders are required to report to.**
+    """)
+    
+st.markdown("---")
 
