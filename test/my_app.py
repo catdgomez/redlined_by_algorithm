@@ -219,7 +219,7 @@ selected_race_vars = []
 for var, label in all_race.items():
     if var == race_baseline_var:
         continue
-    if st.sidebar.checkbox(label, value=False, key=f"race_{var}"):
+    if st.sidebar.checkbox(label, value=True, key=f"race_{var}"):
         selected_race_vars.append(var)
 
 st.sidebar.markdown("---")
@@ -368,6 +368,24 @@ def get_demo_type(v):
 if not demo_vars:
     st.warning("⚠️ Please select at least one group from the sidebar.")
     st.stop()
+
+
+# ── Build control list ────────────────────────────────────────────────────────
+control_parts = []
+if include_income:          control_parts.append("income")
+if include_dti:             control_parts.append("C(debt_to_income_ratio)")
+if include_ltv:             control_parts.append("loan_to_value_ratio")
+if include_loan_type:       control_parts.append("C(loan_type)")
+if include_loan_purpose:    control_parts.append("C(loan_purpose)")
+if include_lien_status:     control_parts.append("C(lien_status)")
+if include_occupancy:       control_parts.append("C(occupancy_type)")
+if include_tract_minority:  control_parts.append("tract_minority_population_percent")
+if include_single_family:   control_parts.append("C(total_units)")
+if include_oelc:            control_parts.append("C(open_end_line_of_credit)")
+if include_reverse:         control_parts.append("C(reverse_mortgage)")
+if include_business:        control_parts.append("C(business_or_commercial_purpose)")
+if include_property_value:  control_parts.append("property_value_scaled")
+if include_loan_amount:     control_parts.append("loan_amount_scaled")
 
 
 # ── Expanders ─────────────────────────────────────────────────────────────────
