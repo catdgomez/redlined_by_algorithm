@@ -388,6 +388,17 @@ if include_property_value:  control_parts.append("property_value_scaled")
 if include_loan_amount:     control_parts.append("loan_amount_scaled")
 
 
+# ── Build formula ─────────────────────────────────────────────────────────────
+
+target_var = 'approved_originated_or_denied'
+
+def build_formula(target, demo_vars, controls):
+    control_vars = " + ".join(demo_vars + controls)
+    return f"{target} ~ {control_vars}"
+
+model = build_formula(target_var, demo_vars, control_parts)
+
+
 # ── Expanders ─────────────────────────────────────────────────────────────────
 st.markdown("---")
 with st.expander("How to read this chart"):
