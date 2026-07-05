@@ -50,7 +50,7 @@ with st.expander("How does this work?"):
 # ── Read in the data ─────────────────────────────────────────────────────────────
 @st.cache_data
 def load_data():
-    # hmda_all_nf is the full OHE dataset before most/any loan type filters are applied
+    # hmda_all_nf is the full NF dataset before most or any loan type filters are applied
     df = pd.read_csv("hmda_all_nf.csv")
     return df
 
@@ -324,7 +324,22 @@ if filter_lien_status and 'lien_status' in df.columns:
 if filter_conventional_loan_type and 'loan_type' in df.columns:
     df = df[df['loan_type'] == 1]    
 st.sidebar.markdown("---")
-    
+
+
+# ── Create age dummy columns if needed ───────────────────────────────────────
+if include_age_section and 'applicant_age' in df.columns:
+    age_map = {
+        '<25':   'applicant_age_lt25',
+        '25-34': 'applicant_age_25_34',
+        '35-44': 'applicant_age_35_44',
+        '45-54': 'applicant_age_45_54',
+        '55-64': 'applicant_age_55_64',
+        '65-74': 'applicant_age_65_74',
+        '>74':   'applicant_age_gt74',
+    }
+    for age_val, col in age_map.items():
+        df[col] = (df['applicant_age'] == age_val).astype(int)
+
 
 # ── Expanders ─────────────────────────────────────────────────────────────────
 st.markdown("---")
