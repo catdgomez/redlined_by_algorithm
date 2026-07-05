@@ -225,7 +225,7 @@ for var, label in all_race.items():
 st.sidebar.markdown("---")
 
 
-# ── Age group selection ─────────────────────────────────────────────────
+######### ── Age group subheader ─────────────────────────────────────────────────#########
 st.sidebar.subheader("Which age groups do you want to include?")
 st.sidebar.markdown(f"Each group is compared to **{age_baseline_label}**.")
 
@@ -339,6 +339,35 @@ if include_age_section and 'applicant_age' in df.columns:
     }
     for age_val, col in age_map.items():
         df[col] = (df['applicant_age'] == age_val).astype(int)
+
+
+# ── Build combined demonstration variabless and labels ────────────────────
+age_labels_map = {
+    "applicant_age_lt25":     "Under 25",
+    "applicant_age_25_34":    "25-34",
+    "applicant_age_35_44":    "35-44",
+    "applicant_age_45_54":    "45-54",
+    "applicant_age_55_64":    "55-64",
+    "applicant_age_65_74":    "65-74",
+    "applicant_age_gt74":     "Over 74",
+    "applicant_age_above_62": "Age 62 or older",
+}
+
+demo_vars  = selected_eth_vars + selected_race_vars + selected_age_vars
+var_labels = {
+    **{v: all_ethnicity[v] for v in selected_eth_vars if v in all_ethnicity},
+    **{v: all_race[v]      for v in selected_race_vars if v in all_race},
+    **{v: age_labels_map[v] for v in selected_age_vars if v in age_labels_map},
+}
+
+def get_demo_type(v):
+    if v in all_ethnicity: return "Ethnicity"
+    if v in all_race:      return "Race"
+    return "Age"
+
+if not demo_vars:
+    st.warning("⚠️ Please select at least one group from the sidebar.")
+    st.stop()
 
 
 # ── Expanders ─────────────────────────────────────────────────────────────────
