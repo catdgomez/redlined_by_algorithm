@@ -421,3 +421,30 @@ if not converged:
 df['predicted_prob'] = result.predict(df)
 
 
+# ── Extract model results ─────────────────────────────────────────────────────
+demo_vars   = [v for v in demo_vars if v in result.params.index]
+params      = result.params[demo_vars]
+conf        = result.conf_int().loc[demo_vars]
+pvalues     = result.pvalues[demo_vars]
+odds_ratios = np.exp(params)
+or_conf     = np.exp(conf)
+
+baseline_map = {
+    "Ethnicity": eth_baseline_label,
+    "Race":      race_baseline_label,
+    "Age":       "25-34",
+}
+
+results_df = pd.DataFrame({
+    "Group":         [var_labels[v] for v in demo_vars],
+    "Type":          [get_demo_type(v) for v in demo_vars],
+    "Approval Odds": odds_ratios.values,
+    "OR Low":        or_conf[0].values,
+    "OR High":       or_conf[1].values,
+    "p-value":       pvalues.values,
+    "Significant":   pvalues.values < 0.05,
+}).set_index("Group")
+
+
+
+
