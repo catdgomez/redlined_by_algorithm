@@ -265,3 +265,42 @@ include_conforming     = st.sidebar.checkbox("Conforming Loan Limit", value=Fals
 
 st.sidebar.markdown("---")
 
+
+# ── Institution and AUS chart settings ───────────────────────────────────────
+st.sidebar.subheader("Lender and AUS chart settings")
+
+min_applications = st.sidebar.slider(
+    "Minimum applications per lender", min_value=10, max_value=500, value=50, step=10,
+    help="Only show lenders with at least this many applications from the selected group"
+)
+top_n_lenders = st.sidebar.slider(
+    "Number of lenders to show", min_value=5, max_value=30, value=15, step=5,
+)
+aus_min = st.sidebar.slider(
+    "Minimum applications per AUS system", min_value=5, max_value=200, value=20, step=5,
+)
+show_comparison = st.sidebar.checkbox(
+    "Show comparison group on lender and AUS charts", value=True,
+    help="Adds a diamond/dot for the baseline group's predicted probability at each lender and AUS"
+)
+
+st.sidebar.markdown("---")
+st.sidebar.markdown(f"""
+**Baselines:**  
+Ethnicity → **{eth_baseline_label}**  
+Race → **{race_baseline_label}**  
+""")
+
+st.sidebar.markdown(f"""
+**Current comparison groups:**  \n
+Ethnicity --> compared to **{eth_baseline_label}** \n
+Race --> compared to **{race_baseline_label}** \n
+Age groups → **25-34** \n
+**Gender** --> I have chosen to exclude gender from this analysis because, in this data, gender had high mismatch rates between self-reported and lender-observed gender fields. This made reliable interpretation impossible without further investigation. 
+""")
+
+
+
+
+
+
