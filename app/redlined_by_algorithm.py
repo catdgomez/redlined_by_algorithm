@@ -11,4 +11,11 @@ import statsmodels.formula.api as smf
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 
+# ── Page config ───────────────────────────────────────────────────────────────
+st.set_page_config(
+    page_title="Redlined by Algorithm",
+    page_icon="🏠",
+    layout="wide"
+)
+
 
