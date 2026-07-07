@@ -48,10 +48,10 @@ with st.expander("What are we looking at?"):
     st.markdown("""
 This tool looks at real mortgage application data from Atlanta, GA across four lenses:
 
-- 1: Odds Chart - After controlling for financial factors, how much better or worse are approval odds by demographic group?
-- 2: Probability Chart - What is the estimated approval probability for a typical applicant in each group?
-- 3: Lenders Chart - Which specific lenders have the lowest predicted approval probabilities for the group you select?
-- 4: Underwriting Systems Chart - Which automated underwriting systems produce the lowest predicted approval probabilities?
+1: Odds Chart - After controlling for financial factors, how much better or worse are approval odds by demographic group?\n
+2: Probability Chart - What is the estimated approval probability for a typical applicant in each group?\n
+3: Lenders Chart - Which specific lenders have the lowest predicted approval probabilities for the group you select?\n
+4: Underwriting Systems Chart - Which automated underwriting systems produce the lowest predicted approval probabilities?\n
 
     """)
 
@@ -82,10 +82,10 @@ def load_data():
 try:
     df_raw = load_data()
 except FileNotFoundError:
-    st.error("⚠️ Data file not found. Make sure `hmda_all_nf.csv` is in the same folder as this app file.")
+    st.error("Data file not found. Make sure `hmda_all_nf.csv` is in the same folder as this app file.")
     st.stop()
 except Exception as e:
-    st.error(f"⚠️ Something went wrong loading the data: {e}")
+    st.error(f"Something went wrong loading the data: {e}")
     st.stop()
 
 
@@ -323,7 +323,7 @@ if filter_primary_residence and 'occupancy_type' in df.columns:
 st.sidebar.markdown("---")
 
 
-# ── Create age group dummy columns if needed ────────────────────────────────────
+# ── Create age group dummy columns if selected ────────────────────────────────────
 if include_age_section and 'applicant_age' in df.columns:
     age_map = {
         '<25':   'applicant_age_lt25',
@@ -337,3 +337,44 @@ if include_age_section and 'applicant_age' in df.columns:
     for age_val, col in age_map.items():
         if col not in df.columns:
             df[col] = (df['applicant_age'] == age_val).astype(int)
+
+
+# ── Show filter impact ────────────────────────────────────────────────────────
+n_total    = len(df_raw)
+n_filtered = len(df)
+n_removed  = n_total - n_filtered
+
+if n_removed > 0:
+    st.info(f"After applying your loan filters, **{n_filtered:,}** applications remain out of {n_total:,} total ({n_removed:,} removed).")
+else:
+    st.info(f"No loan filters have been applied and we're analyzing all **{n_total:,}** applications.")
+
+
+# ── Build combined demo vars and labels ───────────────────────────────────────
+age_labels_map = {
+    "applicant_age_lt25":     "Under 25",
+    "applicant_age_25_34":    "25-34",
+    "applicant_age_45_54":    "45-54",
+    "applicant_age_55_64":    "55-64",
+    "applicant_age_65_74":    "65-74",
+    "applicant_age_gt74":     "Over 74",
+    "applicant_age_above_62": "Age 62 or older",
+}
+
+demo_vars  = selected_eth_vars + selected_race_vars + selected_age_vars
+var_labels = {
+    **{v: all_ethnicity[v] for v in selected_eth_vars},
+    **{v: all_race[v]      for v in selected_race_vars},
+    **{v: age_labels_map[v] for v in selected_age_vars if v in age_labels_map},
+}
+
+def get_demo_type(v):
+    if v in all_ethnicity: return "Ethnicity"
+    if v in all_race:      return "Race"
+    return "Age"
+
+if not demo_vars:
+    st.warning("Please select at least one group from the sidebar.")
+    st.stop()
+
+
