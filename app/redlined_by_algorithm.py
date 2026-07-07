@@ -378,3 +378,18 @@ if not demo_vars:
     st.stop()
 
 
+####### REVIEW FURTHER ONCE COMPLETED                                    #######
+# ── Build control list ─────────────────────────────────────────────────#######
+control_parts = []
+if include_income:          control_parts.append("income")
+if include_dti:             control_parts.append("C(debt_to_income_ratio)")
+if include_ltv:             control_parts.append("loan_to_value_ratio")
+if include_loan_type:       control_parts.append("C(loan_type)")
+if include_loan_purpose:    control_parts.append("C(loan_purpose)")
+if include_lien_status:     control_parts.append("C(lien_status)")
+if include_occupancy:       control_parts.append("C(occupancy_type)")
+if include_tract_minority:  control_parts.append("tract_minority_population_percent")
+if include_conforming:      control_parts.append("C(conforming_loan_limit)")
+
+
+
