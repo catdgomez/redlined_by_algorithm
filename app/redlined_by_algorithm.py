@@ -237,7 +237,13 @@ if include_age_section:
 st.sidebar.markdown("---")
 
 
+# ── Target variable ───────────────────────────────────────────────────────────
+st.sidebar.subheader("Target Variable or Outcome to predict")
+target_options = {"Approved and Originated vs. Denied": "approved_originated_or_denied"}
+target_label = st.sidebar.selectbox("Target Variable", options=list(target_options.keys()), index=0)
+target_var = target_options.get(target_label, target_label)
 
+st.sidebar.markdown("---")
 
 
 
