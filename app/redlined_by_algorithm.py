@@ -300,7 +300,25 @@ Age groups → **25-34** \n
 """)
 
 
+########   last two PULLED FROM MY_APP.PY NOT SAME AS REST                             ########
+######## ── Apply dataset filters ─────────────────────────────────────────────────────########
+df = df_raw.copy()
 
-
-
+if filter_reverse and 'reverse_mortgage' in df.columns:
+    df = df[df['reverse_mortgage'] == 2]
+if filter_open_end and 'open_end_line_of_credit' in df.columns:
+    df = df[df['open_end_line_of_credit'] == 2]
+if filter_business and 'business_or_commercial_purpose' in df.columns:
+    df = df[df['business_or_commercial_purpose'] == 2]
+if filter_single_family and 'total_units' in df.columns:
+    df = df[df['total_units'] == 1]
+if filter_home_purchase and 'loan_purpose' in df.columns:
+    df = df[df['loan_purpose'] == 1]
+if filter_primary_residence and 'occupancy_type' in df.columns:
+    df = df[df['occupancy_type'] == 1]
+# if filter_lien_status and 'lien_status' in df.columns:
+#     df = df[df['lien_status'] == 1]
+# if filter_conventional_loan_type and 'loan_type' in df.columns:
+#     df = df[df['loan_type'] == 1]    
+st.sidebar.markdown("---")
 
