@@ -322,3 +322,18 @@ if filter_primary_residence and 'occupancy_type' in df.columns:
 #     df = df[df['loan_type'] == 1]    
 st.sidebar.markdown("---")
 
+
+# ── Create age group dummy columns if needed ────────────────────────────────────
+if include_age_section and 'applicant_age' in df.columns:
+    age_map = {
+        '<25':   'applicant_age_lt25',
+        '25-34': 'applicant_age_25_34',
+        '35-44': 'applicant_age_35_44',
+        '45-54': 'applicant_age_45_54',
+        '55-64': 'applicant_age_55_64',
+        '65-74': 'applicant_age_65_74',
+        '>74':   'applicant_age_gt74',
+    }
+    for age_val, col in age_map.items():
+        if col not in df.columns:
+            df[col] = (df['applicant_age'] == age_val).astype(int)
