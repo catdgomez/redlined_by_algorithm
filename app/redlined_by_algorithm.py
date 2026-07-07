@@ -245,5 +245,23 @@ target_var = target_options.get(target_label, target_label)
 
 st.sidebar.markdown("---")
 
+# ── Control variable checkboxes ──────────────────────────────────────────────────
+st.sidebar.subheader("Financial factors to hold constant")
+st.sidebar.markdown("The more you check, the more we isolate the demographic factor.")
 
+include_income         = st.sidebar.checkbox("Income", value=True,
+                                            help="The applicant's reported income")
+include_dti            = st.sidebar.checkbox("Debt-to-Income Ratio", value=True,
+                                              help="How much of their income goes toward debt payments each month")
+include_ltv            = st.sidebar.checkbox("Loan-to-Value Ratio", value=True,
+                                             help="How much they're borrowing compared to what the home is worth")
+include_loan_type      = st.sidebar.checkbox("Loan Type - BUT ISNT THIS A FILTER?", value=False,
+                                              help="Turn OFF to see full disparity including loan product steering effects")
+include_loan_purpose   = st.sidebar.checkbox("Loan Purpose", value=False)
+include_lien_status    = st.sidebar.checkbox("Lien Status", value=False)
+include_occupancy      = st.sidebar.checkbox("Occupancy Type", value=False)
+include_tract_minority = st.sidebar.checkbox("Neighborhood Racial Composition", value=True)
+include_conforming     = st.sidebar.checkbox("Conforming Loan Limit", value=False)
+
+st.sidebar.markdown("---")
 
