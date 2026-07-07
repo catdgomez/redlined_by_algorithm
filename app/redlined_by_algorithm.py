@@ -164,7 +164,28 @@ filter_primary_residence = st.sidebar.checkbox("Only include primary residences"
 st.sidebar.markdown("---")
 
 
+# ── Baseline selection ────────────────────────────────────────────────────────
+st.sidebar.subheader("Comparison group or baseline")
+st.sidebar.markdown("Everyone else is compared to this group.")
 
+eth_baseline_options  = {v: k for k, v in all_ethnicity.items()}
+race_baseline_options = {v: k for k, v in all_race.items()}
+
+eth_baseline_label = st.sidebar.selectbox(
+    "Ethnicity baseline",
+    options=list(eth_baseline_options.keys()),
+    index=list(eth_baseline_options.keys()).index("Not Hispanic or Latino"),
+)
+eth_baseline_var = eth_baseline_options[eth_baseline_label]
+
+race_baseline_label = st.sidebar.selectbox(
+    "Race baseline",
+    options=list(race_baseline_options.keys()),
+    index=list(race_baseline_options.keys()).index("White"),
+)
+race_baseline_var = race_baseline_options[race_baseline_label]
+
+st.sidebar.markdown("---")
 
 
 
