@@ -399,6 +399,25 @@ def build_formula(target, demo_vars, controls):
 model = build_formula(target_var, demo_vars, control_parts)
 
 
+# ── Run model ─────────────────────────────────────────────────────────────────
+@st.cache_data(show_spinner=False)
+def run_model(model, filtered_df):
+    model  = smf.logit(model=model, data=filtered_df)
+    res = model.fit(maxiter=1000, disp=False)
+    return res
+
+with st.spinner("Crunching the numbers..."):
+    try:
+        res    = run_model(model, df)
+        converged = res.mle_retvals["converged"]
+    except Exception as e:
+        st.error(f"Model failed to fit: {e}")
+        st.stop()
+
+if not converged:
+    st.warning("⚠️ The model had trouble finding a stable answer. Try unchecking some groups or financial factors.")
+
+
 # ── Expanders ─────────────────────────────────────────────────────────────────
 st.markdown("---")
 with st.expander("How to read this chart"):
