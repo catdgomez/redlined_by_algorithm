@@ -46,10 +46,12 @@ with st.expander("How does this work?"):
 
 with st.expander("What are we looking at?"):
     st.markdown("""
-    1: Odds Chart - After controlling for financial factors, how much better or worse are approval odds by demographic group?
-    2: Probability Chart - What is the estimated approval probability for a typical applicant in each group?
-    3: Lenders Chart - Which specific lenders have the lowest predicted approval probabilities for the group you select?
-    4: Underwriting Systems Chart - Which automated underwriting systems produce the lowest predicted approval probabilities?
+This tool looks at real mortgage application data from Atlanta, GA across four lenses:
+
+- 1: Odds Chart - After controlling for financial factors, how much better or worse are approval odds by demographic group?
+- 2: Probability Chart - What is the estimated approval probability for a typical applicant in each group?
+- 3: Lenders Chart - Which specific lenders have the lowest predicted approval probabilities for the group you select?
+- 4: Underwriting Systems Chart - Which automated underwriting systems produce the lowest predicted approval probabilities?
 
     """)
 
@@ -214,3 +216,28 @@ for var, label in all_race.items():
         selected_race_vars.append(var)
 
 st.sidebar.markdown("---")
+
+
+# ── Age group selection ───────────────────────────────────────────────────────
+st.sidebar.subheader("Age groups")
+
+include_age_section = st.sidebar.checkbox("Include age in the analysis", value=False)
+selected_age_vars = []
+
+if include_age_section:
+    st.sidebar.markdown("**Age groups** compared to **25-34** (baseline):")
+    for var, label in age_bins_to_show.items():
+        if st.sidebar.checkbox(label, value=False, key=f"age_{var}"):
+            selected_age_vars.append(var)
+    st.sidebar.markdown("**Age 62+ flag** is a separate column:")
+    if st.sidebar.checkbox("Include Age 62 or older indicator", value=False, key="age_above_62",
+                            help="A yes or no flag from a separate column can be used alongside or instead of the age groups."):
+        selected_age_vars.append("applicant_age_above_62")
+
+st.sidebar.markdown("---")
+
+
+
+
+
+
