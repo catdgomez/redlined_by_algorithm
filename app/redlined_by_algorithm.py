@@ -188,7 +188,18 @@ race_baseline_var = race_baseline_options[race_baseline_label]
 st.sidebar.markdown("---")
 
 
+# ── Ethnicity group selection ─────────────────────────────────────────────────
+st.sidebar.subheader("Ethnicity groups")
+st.sidebar.markdown(f"Compared to **{eth_baseline_label}**.")
 
+selected_eth_vars = []
+for var, label in all_ethnicity.items():
+    if var == eth_baseline_var:
+        continue
+    if st.sidebar.checkbox(label, value=False, key=f"eth_{var}"):
+        selected_eth_vars.append(var)
+
+st.sidebar.markdown("---")
 
 
 
