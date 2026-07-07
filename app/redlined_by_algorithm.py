@@ -392,4 +392,32 @@ if include_tract_minority:  control_parts.append("tract_minority_population_perc
 if include_conforming:      control_parts.append("C(conforming_loan_limit)")
 
 
+# ── Build formula and run model ───────────────────────────────────────────────
+def build_formula(target, demo_vars, controls):
+    rhs = " + ".join(demo_vars + controls)
+    return f"{target} ~ {rhs}"
+
+formula = build_formula(target_var, demo_vars, control_parts)
+
+@st.cache_data(show_spinner=False)
+def run_model(formula, filtered_df):
+    model  = smf.logit(formula=formula, data=filtered_df)
+    result = model.fit(maxiter=200, disp=False)
+    return result
+
+with st.spinner("Calculating..."):
+    try:
+        result    = run_model(formula, df)
+        converged = result.mle_retvals["converged"]
+    except Exception as e:
+        st.error(f"Model failed to fit: {e}")
+        st.stop()
+
+if not converged:
+    st.warning("The model had trouble finding a stable answer. Try unchecking some groups or financial factors.")
+
+
+# ── Add predicted probabilities to the dataframe ──────────────────────────────
+df['predicted_prob'] = result.predict(df)
+
 
