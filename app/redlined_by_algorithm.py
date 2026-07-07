@@ -53,7 +53,6 @@ with st.expander("What are we looking at?"):
 
     """)
 
-
 with st.expander("What's the break down?"):
     st.markdown("""
     The **odds and probability charts** use a logistic regression model, controlling for financial 
@@ -139,6 +138,30 @@ aus_labels = {
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 st.sidebar.header("Build Your Analysis Here")
+
+
+# ── Dataset filters ───────────────────────────────────────────────────────────
+st.sidebar.subheader("Which types of loans to include?")
+st.sidebar.markdown("""
+By default we include all loan types in the dataset. 
+Check these boxes to narrow down to specific kinds of loans.
+Each one removes certain applications from the analysis entirely.
+""")
+
+filter_reverse = st.sidebar.checkbox("Exclude reverse mortgages", value=False,
+    help="A reverse mortgage is when a homeowner borrows money using their home as collateral and the bank pays them. Very different from a regular home purchase loan.")
+filter_open_end = st.sidebar.checkbox("Exclude open-end lines of credit (HELOCs)", value=False,
+    help="A revolving credit line secured by your home - more like a credit card than a traditional mortgage.")
+filter_business = st.sidebar.checkbox("Exclude business or commercial loans", value=False,
+    help="Loans taken out for business purposes follow different rules than personal home loans.")
+filter_single_family = st.sidebar.checkbox("Only include single-family homes", value=False,
+    help="Excludes multi-unit properties to focus on individual homebuyers.")
+filter_home_purchase = st.sidebar.checkbox("Only include home purchase loans", value=False,
+    help="Excludes refinancing and home improvement loans.")
+filter_primary_residence = st.sidebar.checkbox("Only include primary residences", value=False,
+    help="Excludes second homes and investment properties.")
+
+st.sidebar.markdown("---")
 
 
 
