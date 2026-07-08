@@ -660,3 +660,41 @@ with st.expander("See full results table"):
     - Model found a stable answer: {'✅ Yes' if converged else 'Not quite converged so interpret with caution'}
     """)
 
+
+# ── Focus group selector which is shared by charts 3 and 4 ────────────────────
+st.markdown("---")
+focus_group_options = {var_labels[v]: v for v in demo_vars}
+
+if not focus_group_options:
+    st.info("Select at least one demographic group in the sidebar to see the lender and AUS charts.")
+    st.stop()
+
+focus_label = st.selectbox(
+    "Which group do you want to examine in Charts 3 and 4?",
+    options=list(focus_group_options.keys()),
+    help="Both the lender chart and AUS chart will show predicted probabilities for this group"
+)
+focus_var = focus_group_options[focus_label]
+
+# Determine comparison var for this group
+focus_type = get_demo_type(focus_var)
+if focus_type == "Ethnicity":
+    comparison_var   = eth_baseline_var
+    comparison_label = eth_baseline_label
+elif focus_type == "Race":
+    comparison_var   = race_baseline_var
+    comparison_label = race_baseline_label
+else:
+    comparison_var   = "applicant_age_25_34"
+    comparison_label = "25-34"
+
+# Filter df to focus group
+focus_df = df[df[focus_var] == 1].copy() if focus_var in df.columns else pd.DataFrame()
+
+# Filter df to comparison group
+comp_df = df[df[comparison_var] == 1].copy() if comparison_var in df.columns else pd.DataFrame()
+
+
+
+
+
