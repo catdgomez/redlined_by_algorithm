@@ -598,4 +598,40 @@ Comparing all groups to their baselines:
 """)
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+# ── CHART 2: PREDICTED PROBABILITIES ─────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════════════
+st.subheader("Chart 2 - Estimated Approval Probability")
+st.markdown(f"Estimated probability of approval for a typical applicant with median financial characteristics. Baseline ({eth_baseline_label if selected_eth_vars else race_baseline_label}): **{baseline_prob:.1%}**")
+
+fig2, ax2 = plt.subplots(figsize=(fig_width, fig_height))
+
+probs      = [group_probs.get(label, np.nan) for label in labels_ordered]
+bar_colors = []
+for var in demo_vars:
+    is_sig    = pvalues[var] < 0.05
+    demo_type = get_demo_type(var)
+    bar_colors.append("#c0392b" if is_sig else type_colors.get(demo_type, "steelblue"))
+
+bars = ax2.barh(range(len(demo_vars)), probs, color=bar_colors, height=0.6, zorder=2)
+ax2.axvline(baseline_prob, color="black", linestyle="--", linewidth=1.5,
+            label=f"Baseline: {baseline_prob:.1%}")
+
+for i, prob in enumerate(probs):
+    if not np.isnan(prob):
+        ax2.text(prob + 0.005, i, f"{prob:.1%}", va='center', fontsize=9)
+
+ax2.set_yticks(range(len(demo_vars)))
+ax2.set_yticklabels(labels_ordered)
+ax2.set_xlabel("Estimated probability of approval")
+ax2.set_xlim(0, 1.15)
+ax2.xaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f"{x:.0%}"))
+ax2.axvline(0.5, color='gray', linestyle=':', linewidth=0.8, alpha=0.5)
+ax2.set_title("Estimated Approval Probability - What are the actual chances?", fontweight='bold')
+ax2.legend(fontsize=8, loc="lower right")
+
+plt.tight_layout()
+st.pyplot(fig2)
+plt.close()
+
 
