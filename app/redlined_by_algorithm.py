@@ -89,6 +89,20 @@ except Exception as e:
     st.stop()
 
 
+######## ── Load HMDA panel for institution names if available ────────────────────────########
+@st.cache_data
+def load_panel():
+    try:
+        panel = pd.read_csv("2022_public_panel.csv")
+        if 'lei' in panel.columns and 'respondent_name' in panel.columns:
+            return panel[['lei', 'respondent_name']].drop_duplicates()
+    except Exception:
+        pass
+    return None
+
+panel_df = load_panel()
+
+
 # ── All available demographic variables ───────────────────────────────────────
 all_ethnicity = {
     "is_hispanic":  "Any Hispanic or Latino (combined)",
@@ -803,6 +817,8 @@ else:
             file_name=f"lender_pred_prob_{focus_label.replace(' ', '_')}.csv",
             mime="text/csv"
         )
+
+
 
 
 # ══════════════════════════════════════════════════════════════════════════════
