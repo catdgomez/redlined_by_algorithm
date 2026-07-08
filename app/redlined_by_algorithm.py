@@ -526,17 +526,49 @@ with pc4:
 labels_ordered = [var_labels[v] for v in demo_vars]
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+# ── CHART 1: ODDS RATIOS ─────────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════════════
+st.subheader("Chart 1 - Approval Odds")
+st.markdown("How much better or worse are the approval odds for each group compared to the baseline, after controlling for financial factors?")
+
+fig1, ax1 = plt.subplots(figsize=(fig_width, fig_height))
+
+prev_type = None
+for i, var in enumerate(demo_vars):
+    is_sig    = pvalues[var] < 0.05
+    demo_type = get_demo_type(var)
+    dot_color = "#c0392b" if is_sig else type_colors.get(demo_type, "steelblue")
+    ax1.plot([or_conf.loc[var, 0], or_conf.loc[var, 1]], [i, i],
+             color=dot_color, linewidth=2, zorder=2)
+    ax1.plot(odds_ratios[var], i, 'o', color=dot_color, markersize=8, zorder=3)
+    if prev_type and demo_type != prev_type:
+        ax1.axhline(i - 0.5, color='gray', linestyle=':', linewidth=0.8, alpha=0.5)
+    prev_type = demo_type
+
+ax1.axvline(1, color="black", linestyle="--", linewidth=1)
+ax1.set_yticks(range(len(demo_vars)))
+ax1.set_yticklabels(labels_ordered)
+ax1.set_xlabel("Approval odds relative to baseline\n(below 1.0 = worse odds  |  above 1.0 = better odds)")
+ax1.set_xlim(x_min, x_max)
+ax1.set_title("Odds Ratio - How much better or worse compared to the baseline?", fontweight='bold')
+
+sig_patch  = mpatches.Patch(color="#c0392b",   label="Statistically significant difference (p < 0.05)")
+eth_patch  = mpatches.Patch(color="steelblue", label="Ethnicity")
+race_patch = mpatches.Patch(color="#2ecc71",   label="Race")
+age_patch  = mpatches.Patch(color="#e67e22",   label="Age")
+no_effect  = plt.Line2D([0], [0], color='black', linestyle='--', label='No difference from baseline')
+ax1.legend(handles=[sig_patch, eth_patch, race_patch, age_patch, no_effect],
+           fontsize=8, loc="lower right")
+
+plt.tight_layout()
+st.pyplot(fig1)
+plt.close()
+
+
 # ── Plain english summary ─────────────────────────────────────────────────────
 st.markdown("---")
 st.subheader("What the data shows")
-st.markdown(f"""
-Comparing all groups to their baselines:  
-- **Ethnicity:** {eth_baseline_label}  
-- **Race:** {race_baseline_label}  
-- **Age bins:** 25-34  
-
-**Estimated approval probability for a typical baseline applicant: {baseline_prob:.1%}**
-""")
 
 sig_results = results_df[results_df["Significant"]]
 if len(sig_results) == 0:
@@ -556,7 +588,14 @@ else:
             prob_str = f" Their estimated approval probability is **{prob:.1%}**." if prob else ""
             st.success(f"**{group}** applicants had about **{pct}% higher odds** of getting approved compared to **{baseline}** applicants.{prob_str}")
 
+st.markdown(f"""
+Comparing all groups to their baselines:  
+- **Ethnicity:** {eth_baseline_label}  
+- **Race:** {race_baseline_label}  
+- **Age bins:** 25-34  
 
+**Estimated approval probability for a typical baseline applicant: {baseline_prob:.1%}**
+""")
 
 
 
