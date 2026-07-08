@@ -805,6 +805,138 @@ else:
         )
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+# ── CHART 4: AUS PREDICTED PROBABILITIES ─────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════════════
+st.markdown("---")
+st.subheader("Chart 4 - Automated Underwriting Systems: Predicted Approval Probability")
+st.markdown(f"""
+Average predicted probability of approval for **{focus_label}** applicants processed through 
+each automated underwriting system, ordered from lowest to highest.
+""")
+
+aus_cols = [c for c in ['aus-1', 'aus-2', 'aus-3', 'aus-4', 'aus-5'] if c in df.columns]
+
+if not aus_cols:
+    st.warning("No AUS columns found in the dataset.")
+elif focus_df.empty:
+    st.warning(f"No applications found for {focus_label}.")
+else:
+    # Melt AUS columns — include predicted_prob
+    aus_melted = focus_df[['unique_id', target_var, 'predicted_prob'] + aus_cols].melt(
+        id_vars=['unique_id', target_var, 'predicted_prob'],
+        value_vars=aus_cols,
+        var_name='aus_col',
+        value_name='aus_code'
+    )
+    aus_melted = aus_melted.dropna(subset=['aus_code'])
+    aus_melted['aus_code'] = pd.to_numeric(aus_melted['aus_code'], errors='coerce')
+    aus_melted = aus_melted[~aus_melted['aus_code'].isin([6, 1111])]
+    aus_melted = aus_melted.dropna(subset=['aus_code'])
+    aus_melted['aus_code'] = aus_melted['aus_code'].astype(int)
+
+    if aus_melted.empty:
+        st.warning("No valid AUS data found for this group.")
+    else:
+        # Average predicted prob by AUS
+        aus_stats = (
+            aus_melted.groupby('aus_code')['predicted_prob']
+            .agg(['mean', 'count'])
+            .reset_index()
+        )
+        aus_stats.columns = ['aus_code', 'pred_prob', 'n_applications']
+        aus_stats['aus_name'] = aus_stats['aus_code'].map(aus_labels).fillna(aus_stats['aus_code'].astype(str))
+        aus_stats = aus_stats[aus_stats['n_applications'] >= aus_min]
+
+        if aus_stats.empty:
+            st.warning(f"No AUS systems have at least {aus_min} applications from {focus_label}. Try lowering the minimum.")
+        else:
+            # Comparison group AUS predicted probs
+            if show_comparison and not comp_df.empty:
+                aus_comp_melted = comp_df[['unique_id', target_var, 'predicted_prob'] + aus_cols].melt(
+                    id_vars=['unique_id', target_var, 'predicted_prob'],
+                    value_vars=aus_cols,
+                    var_name='aus_col',
+                    value_name='aus_code'
+                )
+                aus_comp_melted = aus_comp_melted.dropna(subset=['aus_code'])
+                aus_comp_melted['aus_code'] = pd.to_numeric(aus_comp_melted['aus_code'], errors='coerce')
+                aus_comp_melted = aus_comp_melted[~aus_comp_melted['aus_code'].isin([6, 1111])]
+                aus_comp_melted = aus_comp_melted.dropna(subset=['aus_code'])
+                aus_comp_melted['aus_code'] = aus_comp_melted['aus_code'].astype(int)
+
+                aus_comp_stats = (
+                    aus_comp_melted.groupby('aus_code')['predicted_prob']
+                    .agg(['mean', 'count'])
+                    .reset_index()
+                )
+                aus_comp_stats.columns = ['aus_code', 'comp_pred_prob', 'comp_n']
+                aus_stats = aus_stats.merge(aus_comp_stats, on='aus_code', how='left')
+
+            # Sort lowest to highest
+            aus_stats = aus_stats.sort_values('pred_prob', ascending=True)
+
+            ac1, ac2 = st.columns(2)
+            with ac1:
+                aus_width  = st.number_input("AUS chart width",  min_value=6, max_value=24, value=12, step=1, key="aw")
+            with ac2:
+                aus_height = st.number_input("AUS chart height", min_value=3, max_value=16,
+                                             value=max(4, int(len(aus_stats) * 0.8 + 1.5)), step=1, key="ah")
+
+            fig4, ax4 = plt.subplots(figsize=(aus_width, aus_height))
+            y_pos = range(len(aus_stats))
+
+            ax4.barh(y_pos, aus_stats['pred_prob'],
+                     color="#9b59b6", height=0.5,
+                     label=f"{focus_label}", zorder=2)
+
+            if show_comparison and 'comp_pred_prob' in aus_stats.columns:
+                ax4.scatter(
+                    aus_stats['comp_pred_prob'], y_pos,
+                    color="steelblue", zorder=3, s=60,
+                    label=f"{comparison_label} (comparison)",
+                    marker='D'
+                )
+
+            for i, (_, row) in enumerate(aus_stats.iterrows()):
+                prob = row['pred_prob']
+                n    = int(row['n_applications'])
+                ax4.text(prob + 0.005, i, f"{prob:.1%}  (n={n:,})", va='center', fontsize=9)
+
+            ax4.set_yticks(list(y_pos))
+            ax4.set_yticklabels(aus_stats['aus_name'], fontsize=9)
+            ax4.set_xlabel("Average predicted probability of approval (lowest to highest)")
+            ax4.set_xlim(0, 1.2)
+            ax4.xaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f"{x:.0%}"))
+            ax4.set_title(
+                f"AUS — Predicted Approval Probability for {focus_label}\n"
+                f"(minimum {aus_min} applications | ordered lowest to highest)",
+                fontweight='bold'
+            )
+            ax4.axvline(0.5, color='gray', linestyle=':', linewidth=0.8, alpha=0.5)
+            ax4.legend(fontsize=9, loc='lower right')
+            ax4.grid(axis='x', alpha=0.3)
+
+            plt.tight_layout()
+            st.pyplot(fig4)
+            plt.close()
+
+            best_aus  = aus_stats.iloc[-1]
+            worst_aus = aus_stats.iloc[0]
+            st.markdown(f"""
+            **Highest predicted probability:** {best_aus['pred_prob']:.1%} — {best_aus['aus_name']} (n={int(best_aus['n_applications']):,})  
+            **Lowest predicted probability:** {worst_aus['pred_prob']:.1%} — {worst_aus['aus_name']} (n={int(worst_aus['n_applications']):,})
+            """)
+
+            aus_download = aus_stats[['aus_name', 'pred_prob', 'n_applications']].copy()
+            aus_download.columns = ['AUS System', 'Predicted Probability', 'Applications']
+            aus_download['Predicted Probability'] = aus_download['Predicted Probability'].apply(lambda x: f"{x:.1%}")
+            st.download_button(
+                label="Download AUS data as CSV",
+                data=aus_download.to_csv(index=False),
+                file_name=f"aus_pred_prob_{focus_label.replace(' ', '_')}.csv",
+                mime="text/csv"
+            )
 
 
 
