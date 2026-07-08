@@ -378,7 +378,7 @@ if not demo_vars:
     st.stop()
 
 
-####### REVIEW FURTHER ONCE COMPLETED                                    #######
+####### REVIEW FURTHER ONCE COMPLETED POSSIBLY ADD MORE TO CHART 2 calc pred probs #######
 # ── Build control list ─────────────────────────────────────────────────#######
 control_parts = []
 if include_income:          control_parts.append("income")
@@ -444,6 +444,64 @@ results_df = pd.DataFrame({
     "p-value":       pvalues.values,
     "Significant":   pvalues.values < 0.05,
 }).set_index("Group")
+
+
+# ── Calculate predicted probabilities for chart 2/probability chart ───────────────────
+def get_typical_applicant(df, control_parts):
+    profile = {}
+    if "income" in control_parts:
+        profile["income"] = df["income"].median()
+    if "loan_to_value_ratio" in control_parts:
+        profile["loan_to_value_ratio"] = df["loan_to_value_ratio"].median()
+    if "tract_minority_population_percent" in control_parts:
+        profile["tract_minority_population_percent"] = df["tract_minority_population_percent"].median()
+    for part in control_parts:
+        if part.startswith("C("):
+            col = part[2:-1]
+            if col in df.columns:
+                profile[col] = df[col].mode()[0]
+    return profile
+
+typical = get_typical_applicant(df, control_parts)
+
+def predict_prob(result, var, demo_vars, typical_profile, control_parts):
+    intercept = result.params.get("Intercept", 0)
+    log_odds  = intercept
+    for dv in demo_vars:
+        coef     = result.params.get(dv, 0)
+        val      = 1 if dv == var else 0
+        log_odds += coef * val
+    for part in control_parts:
+        if part.startswith("C("):
+            col = part[2:-1]
+            if col in typical_profile:
+                ref_val  = typical_profile[col]
+                coef_key = f"C({col})[T.{ref_val}]"
+                coef     = result.params.get(coef_key, 0)
+                log_odds += coef
+        else:
+            col  = part
+            coef = result.params.get(col, 0)
+            val  = typical_profile.get(col, 0)
+            log_odds += coef * val
+    return 1 / (1 + np.exp(-log_odds))
+
+group_probs = {var_labels[v]: predict_prob(result, v, demo_vars, typical, control_parts)
+               for v in demo_vars}
+
+# Baseline probability
+baseline_log_odds = result.params.get("Intercept", 0)
+for part in control_parts:
+    if part.startswith("C("):
+        col = part[2:-1]
+        if col in typical:
+            coef_key = f"C({col})[T.{typical[col]}]"
+            baseline_log_odds += result.params.get(coef_key, 0)
+    else:
+        col  = part
+        coef = result.params.get(col, 0)
+        baseline_log_odds += coef * typical.get(col, 0)
+baseline_prob = 1 / (1 + np.exp(-baseline_log_odds))
 
 
 
