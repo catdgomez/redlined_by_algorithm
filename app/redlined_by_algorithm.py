@@ -627,11 +627,36 @@ ax2.set_xlabel("Estimated probability of approval")
 ax2.set_xlim(0, 1.15)
 ax2.xaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f"{x:.0%}"))
 ax2.axvline(0.5, color='gray', linestyle=':', linewidth=0.8, alpha=0.5)
-ax2.set_title("Estimated Approval Probability - What are the actual chances?", fontweight='bold')
+ax2.set_title("Estimated Approval Probability - What are the chances?", fontweight='bold')
 ax2.legend(fontsize=8, loc="lower right")
 
 plt.tight_layout()
 st.pyplot(fig2)
 plt.close()
 
+
+# ── Results table ─────────────────────────────────────────────────────────────
+with st.expander("See full results table"):
+    display_df = pd.DataFrame({
+        "Type":              results_df["Type"],
+        "Compared to":       results_df["Type"].map(baseline_map),
+        "Odds Ratio":        results_df["Approval Odds"].round(3),
+        "Est. Probability":  [f"{group_probs.get(g, np.nan):.1%}" for g in results_df.index],
+        "p-value":           results_df["p-value"].round(4),
+        "Statistically Significant?":       results_df["Significant"].map({True: "✅ Yes", False: "❌ Not sure"}),
+    })
+    st.dataframe(
+        display_df.style.apply(
+            lambda row: ["background-color: #e74c3c; color: white"
+                         if "Yes" in str(row["Statistically Significant?"]) else "" for _ in row],
+            axis=1
+        ),
+        use_container_width=True
+    )
+    st.markdown(f"""
+    - Applications analyzed: {int(result.nobs):,}
+    - Financial factors held constant: {len(control_parts)}
+    - Baseline approval probability: {baseline_prob:.1%}
+    - Model found a stable answer: {'✅ Yes' if converged else 'Not quite converged so interpret with caution'}
+    """)
 
