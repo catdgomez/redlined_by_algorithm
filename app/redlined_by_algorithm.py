@@ -695,6 +695,116 @@ focus_df = df[df[focus_var] == 1].copy() if focus_var in df.columns else pd.Data
 comp_df = df[df[comparison_var] == 1].copy() if comparison_var in df.columns else pd.DataFrame()
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+# ── CHART 3: LENDER PREDICTED PROBABILITIES ───────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════════════
+st.subheader("Chart 3 - Lenders with the Lowest Predicted Approval Probabilities")
+st.markdown(f"""
+Average predicted probability of approval for **{focus_label}** applicants at each lender,  
+ordered from lowest to highest. Based on the model's predictions for each application - not raw approval rates.
+""")
+
+if 'lei' not in df.columns:
+    st.warning("LEI column not found in the dataset.")
+elif focus_df.empty:
+    st.warning(f"No applications found for {focus_label} in the current dataset.")
+else:
+    # Average predicted prob by lender for focus group
+    lender_stats = (
+        focus_df.groupby('lei')['predicted_prob']
+        .agg(['mean', 'count'])
+        .reset_index()
+    )
+    lender_stats.columns = ['lei', 'pred_prob', 'n_applications']
+    lender_stats = lender_stats[lender_stats['n_applications'] >= min_applications]
+
+    if lender_stats.empty:
+        st.warning(f"No lenders have at least {min_applications} applications from {focus_label}. Try lowering the minimum applications slider.")
+    else:
+        bottom_lenders = lender_stats.nsmallest(top_n_lenders, 'pred_prob')
+
+        # Add institution names
+        if panel_df is not None:
+            bottom_lenders = bottom_lenders.merge(panel_df, on='lei', how='left')
+            bottom_lenders['institution'] = bottom_lenders.get('respondent_name', bottom_lenders['lei']).fillna(bottom_lenders['lei'])
+        else:
+            bottom_lenders['institution'] = bottom_lenders['lei']
+
+        # Comparison group predicted prob by lender
+        if show_comparison and not comp_df.empty:
+            comp_lender_stats = (
+                comp_df.groupby('lei')['predicted_prob']
+                .agg(['mean', 'count'])
+                .reset_index()
+            )
+            comp_lender_stats.columns = ['lei', 'comp_pred_prob', 'comp_n']
+            bottom_lenders = bottom_lenders.merge(comp_lender_stats, on='lei', how='left')
+
+        bottom_lenders = bottom_lenders.sort_values('pred_prob', ascending=True)
+
+        lc1, lc2 = st.columns(2)
+        with lc1:
+            lender_width  = st.number_input("Lender chart width",  min_value=6, max_value=24, value=12, step=1, key="lw")
+        with lc2:
+            lender_height = st.number_input("Lender chart height", min_value=4, max_value=24,
+                                            value=max(5, int(len(bottom_lenders) * 0.5 + 2)), step=1, key="lh")
+
+        fig3, ax3 = plt.subplots(figsize=(lender_width, lender_height))
+        y_pos = range(len(bottom_lenders))
+
+        ax3.barh(y_pos, bottom_lenders['pred_prob'],
+                 color="#c0392b", height=0.5,
+                 label=f"{focus_label}", zorder=2)
+
+        if show_comparison and 'comp_pred_prob' in bottom_lenders.columns:
+            ax3.scatter(
+                bottom_lenders['comp_pred_prob'], y_pos,
+                color="steelblue", zorder=3, s=60,
+                label=f"{comparison_label} (comparison)",
+                marker='D'
+            )
+
+        for i, (_, row) in enumerate(bottom_lenders.iterrows()):
+            prob = row['pred_prob']
+            n    = int(row['n_applications'])
+            ax3.text(prob + 0.005, i, f"{prob:.1%}  (n={n:,})", va='center', fontsize=8)
+
+        ax3.set_yticks(list(y_pos))
+        ax3.set_yticklabels(bottom_lenders['institution'], fontsize=9)
+        ax3.set_xlabel("Average predicted probability of approval")
+        ax3.set_xlim(0, 1.2)
+        ax3.xaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f"{x:.0%}"))
+        ax3.set_title(
+            f"Lenders — Lowest Predicted Approval Probability for {focus_label}\n"
+            f"(minimum {min_applications:,} applications | bottom {len(bottom_lenders)})",
+            fontweight='bold'
+        )
+        ax3.axvline(0.5, color='gray', linestyle=':', linewidth=0.8, alpha=0.5)
+        ax3.legend(fontsize=9, loc='lower right')
+        ax3.grid(axis='x', alpha=0.3)
+
+        plt.tight_layout()
+        st.pyplot(fig3)
+        plt.close()
+
+        overall_pred = focus_df['predicted_prob'].mean()
+        st.markdown(f"""
+        **Average predicted approval probability for {focus_label} across all lenders:** {overall_pred:.1%}  
+        **Lowest in this list:** {bottom_lenders['pred_prob'].min():.1%} — {bottom_lenders.iloc[0]['institution']}  
+        **Highest in this list:** {bottom_lenders['pred_prob'].max():.1%} — {bottom_lenders.iloc[-1]['institution']}
+        """)
+
+        download_df = bottom_lenders[['lei', 'institution', 'pred_prob', 'n_applications']].copy()
+        download_df.columns = ['LEI', 'Institution', 'Predicted Probability', 'Applications']
+        download_df['Predicted Probability'] = download_df['Predicted Probability'].apply(lambda x: f"{x:.1%}")
+        st.download_button(
+            label="Download lender data as CSV",
+            data=download_df.to_csv(index=False),
+            file_name=f"lender_pred_prob_{focus_label.replace(' ', '_')}.csv",
+            mime="text/csv"
+        )
+
+
 
 
 
