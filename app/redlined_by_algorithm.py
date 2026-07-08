@@ -939,4 +939,89 @@ else:
             )
 
 
+# ── Expanders ─────────────────────────────────────────────────────────────────
+st.markdown("---")
+with st.expander("How to read these charts"):
+    st.markdown("""
+    **Chart 1 - Odds Ratio:**  
+    Each dot shows approval odds for that group vs. the baseline after controlling for financial factors.  
+    A dot to the left means lower odds. Red = statistically significant (p < 0.05).
+
+    **Chart 2 - Probability:**  
+    Estimated approval probability for a hypothetical typical applicant with median financial 
+    characteristics. The dashed line is the baseline group's probability.
+
+    **Chart 3 - Lenders:**  
+    Average predicted probability of approval for the selected group's actual applications at each lender.  
+    These are model predictions — not raw approval rates — so financial differences between applicants 
+    are already accounted for. Blue diamonds show the baseline group's predicted probability at the 
+    same lender. Large gaps are worth investigating.
+
+    **Chart 4 - AUS:**  
+    Same as Chart 3 but broken down by automated underwriting system instead of lender.  
+    Ordered from lowest to highest predicted probability.
+    """)
+
+with st.expander("Approval rate vs. predicted probability — what's the difference?"):
+    st.markdown("""
+    **Approval rate** is a simple observed percentage — of all applications submitted, 
+    what fraction was actually approved? It includes all the variation in who applied 
+    (different incomes, debt levels, loan sizes).
+
+    **Predicted probability** is what the model estimates each individual application's 
+    approval chance to be, given the applicant's financial profile and demographic group. 
+    Averaging these predictions by lender or AUS tells you where the model predicts the 
+    lowest chances — with financial differences already baked in.
+
+    Charts 3 and 4 use predicted probabilities, not approval rates. This means the lender 
+    and AUS comparisons are already partially adjusted for financial differences in who applies.
+    """)
+
+with st.expander("What are Automated Underwriting Systems?"):
+    st.markdown("""
+    Automated Underwriting Systems (AUS) are software platforms lenders submit loan applications 
+    to for an automated risk assessment. The AUS returns a recommendation — typically "Approve/Eligible," 
+    "Refer," or "Refer with Caution" — that heavily influences whether the loan gets approved.
+
+    - **Desktop Underwriter (DU)** — owned by Fannie Mae, most widely used for conventional loans
+    - **Loan Product Advisor (LPA)** — owned by Freddie Mac, second most common for conventional loans
+    - **TOTAL Scorecard** — used for FHA loans
+    - **GUS** — used for USDA rural housing loans
+    - **Internal Proprietary System** — the lender's own in-house system
+
+    If one AUS consistently produces lower predicted approval probabilities for a demographic group 
+    compared to another, that raises questions about whether the algorithm itself may be producing 
+    disparate outcomes — a core concern in AI fairness research.
+    """)
+
+with st.expander("What is an LEI?"):
+    st.markdown("""
+    LEI stands for **Legal Entity Identifier** — a unique code assigned to every financial institution 
+    that reports HMDA data. If institution names aren't showing, the HMDA panel file 
+    (`2022_public_panel.csv`) isn't in the same folder as the app. Download it from 
+    **https://ffiec.cfpb.gov/data-browser/**.
+    """)
+
+with st.expander("What do the loan filters mean?"):
+    st.markdown("""
+    **Reverse mortgages** — older homeowners borrowing against home equity. Very different from regular mortgages.  
+    **HELOCs** — revolving credit secured by your home. More like a credit card.  
+    **Business or commercial loans** — loans for businesses, not individual homebuyers.  
+    **Single-family homes only** — excludes duplexes, apartment buildings, etc.  
+    **Home purchase only** — excludes refinancing and home improvement loans.  
+    **Primary residences only** — excludes second homes and investment properties.
+    """)
+
+with st.expander("Why does this matter?"):
+    st.markdown("""
+    Federal law — specifically the **Equal Credit Opportunity Act** — says lenders can't discriminate 
+    based on race, color, religion, national origin, sex, marital status, or age.
+
+    When one group consistently gets lower predicted approval probabilities, especially at specific 
+    lenders or through specific underwriting systems, that's the pattern regulators look for in 
+    fair lending investigations.
+
+    **This data is from 2020 to 2024, covers the Atlanta metro area, and comes from HMDA which is a federal database 
+    lenders are required to report to.**
+    """)
 
