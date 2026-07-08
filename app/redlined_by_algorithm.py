@@ -504,5 +504,59 @@ for part in control_parts:
 baseline_prob = 1 / (1 + np.exp(-baseline_log_odds))
 
 
+# ── Chart size controls ───────────────────────────────────────────────────────
+st.markdown("---")
+type_colors = {
+    "Ethnicity": "steelblue",
+    "Race":      "#2ecc71",
+    "Age":       "#e67e22",
+}
+
+pc1, pc2, pc3, pc4 = st.columns(4)
+with pc1:
+    fig_width  = st.number_input("Chart width",  min_value=4, max_value=24, value=10, step=1)
+with pc2:
+    fig_height = st.number_input("Chart height", min_value=3, max_value=20,
+                                 value=max(4, int(len(demo_vars) * 0.65 + 1.5)), step=1)
+with pc3:
+    x_min = st.number_input("Odds chart left edge",  min_value=0.0, max_value=5.0,  value=0.0, step=0.5)
+with pc4:
+    x_max = st.number_input("Odds chart right edge", min_value=1.0, max_value=50.0, value=5.0, step=0.5)
+
+labels_ordered = [var_labels[v] for v in demo_vars]
+
+
+# ── Plain english summary ─────────────────────────────────────────────────────
+st.markdown("---")
+st.subheader("What the data shows")
+st.markdown(f"""
+Comparing all groups to their baselines:  
+- **Ethnicity:** {eth_baseline_label}  
+- **Race:** {race_baseline_label}  
+- **Age bins:** 25-34  
+
+**Estimated approval probability for a typical baseline applicant: {baseline_prob:.1%}**
+""")
+
+sig_results = results_df[results_df["Significant"]]
+if len(sig_results) == 0:
+    st.info("With the current settings, no group shows a meaningful difference in approval odds.")
+else:
+    for group, row in sig_results.iterrows():
+        or_val   = row["Approval Odds"]
+        grp_type = row["Type"]
+        baseline = baseline_map.get(grp_type, "the baseline group")
+        prob     = group_probs.get(group, None)
+        if or_val < 1:
+            pct = round((1 - or_val) * 100)
+            prob_str = f" Their estimated approval probability is **{prob:.1%}**." if prob else ""
+            st.error(f"**{group}** applicants had about **{pct}% lower odds** of getting approved compared to **{baseline}** applicants.{prob_str}")
+        else:
+            pct = round((or_val - 1) * 100)
+            prob_str = f" Their estimated approval probability is **{prob:.1%}**." if prob else ""
+            st.success(f"**{group}** applicants had about **{pct}% higher odds** of getting approved compared to **{baseline}** applicants.{prob_str}")
+
+
+
 
 
