@@ -37,9 +37,7 @@ with st.expander("How does this work?"):
     st.markdown("""
     We're using a statistical model called logistic regression.
     
-    We're looking at thousands of mortgage applications and figure out what predicts whether someone gets 
-    approved or denied. We can tell it to hold constant certain financial factors, comparing people who 
-    look financially similar on paper, and then see if race or ethnicity still makes a difference.
+    We're looking at thousands of mortgage applications and figure out what predicts whether someone gets approved or denied. We can tell it to hold constant certain financial factors, comparing people who look financially similar on paper, and then see if race or ethnicity still makes a difference.
     
     **If it does, that's a sign that something other than finances might be influencing the decision.**
     """)
@@ -51,21 +49,21 @@ This tool looks at real mortgage application data from Atlanta, GA across four l
 1: Odds Chart - After controlling for financial factors, how much better or worse are approval odds by demographic group?\n
 2: Probability Chart - What is the estimated approval probability for a typical applicant in each group?\n
 3: Lenders Chart - Which specific lenders have the lowest predicted approval probabilities for the group you select?\n
-4: Underwriting Systems Chart - Which automated underwriting systems produce the lowest predicted approval probabilities?\n
+4: Underwriting Systems Chart - Which automated underwriting systems produce the lowest predicted approval probabilities for the group you select?\n
 
     """)
 
 with st.expander("What's the break down?"):
     st.markdown("""
     The **odds and probability charts** use a logistic regression model, controlling for financial 
-    factors like income and debt, to isolate the effect of race, ethnicity, and age on approval outcomes.
+    factors like income and debt to income ratio, in order to isolate the effect of race, ethnicity, and age on approval outcomes.
     
     The **lender and AUS charts** take the model's predicted probability for every individual 
     application and average those predictions by lender or underwriting system. This means the 
     lender and AUS charts are also model-based, they show predicted probabilities, not raw 
     approval rates, so financial differences between applicants are already baked in.
     
-    **Approval rate** = raw percentage of applications approved (no adjustments).  
+    **Approval rate** = raw percentage of applications approved without adjustments.  
 
     **Predicted probability** = what the model estimates each applicant's approval chance to be, 
     given their financial profile and demographic group. Averaging these by lender or AUS tells 
@@ -167,22 +165,28 @@ Each one removes certain applications from the analysis entirely.
 filter_reverse = st.sidebar.checkbox("Exclude reverse mortgages", value=False,
     help="A reverse mortgage is when a homeowner borrows money using their home as collateral and the bank pays them. Very different from a regular home purchase loan.")
 filter_open_end = st.sidebar.checkbox("Exclude open-end lines of credit (HELOCs)", value=False,
-    help="A revolving credit line secured by your home - more like a credit card than a traditional mortgage.")
+    help="A revolving credit line secured by your home which is more like a credit card than a traditional mortgage.")
 filter_business = st.sidebar.checkbox("Exclude business or commercial loans", value=False,
-    help="Loans taken out for business purposes follow different rules than personal home loans.")
+    help="Loans taken out for business purposes follow different rules and involve different applicants (companies, investors) than personal home loans.")
 filter_single_family = st.sidebar.checkbox("Only include single-family homes", value=False,
     help="Excludes multi-unit properties to focus on individual homebuyers.")
 filter_home_purchase = st.sidebar.checkbox("Only include home purchase loans", value=False,
     help="Excludes refinancing and home improvement loans.")
 filter_primary_residence = st.sidebar.checkbox("Only include primary residences", value=False,
     help="Excludes second homes and investment properties.")
-
+filter_lien_status = st.sidebar.checkbox("Only include primary mortgages", value=False,
+    help="Excludes a subordinated lien which means there is already another loan on the home that gets paid first if the borrower defaults.")
+filter_conventional_loan_type = st.sidebar.checkbox("Only include conventional mortgages", value=False,
+    help="""Excludes loans insured or guaranteed by Federal Housing Administration (FHA), Veterans Affairs (VA), USDA Rural Housing Service (RHS), or Farm Service Agency (FSA).""")
 st.sidebar.markdown("---")
 
 
 # ── Baseline selection ────────────────────────────────────────────────────────
-st.sidebar.subheader("Comparison group or baseline")
-st.sidebar.markdown("Everyone else is compared to this group.")
+st.sidebar.subheader("Who is the comparison group or the baseline")
+st.sidebar.markdown("""
+The **comparison group**, or baseline, is who everyone else gets compared to. 
+All approval odds in the chart are shown relative to this group.
+""")
 
 eth_baseline_options  = {v: k for k, v in all_ethnicity.items()}
 race_baseline_options = {v: k for k, v in all_race.items()}
@@ -191,6 +195,7 @@ eth_baseline_label = st.sidebar.selectbox(
     "Ethnicity baseline",
     options=list(eth_baseline_options.keys()),
     index=list(eth_baseline_options.keys()).index("Not Hispanic or Latino"),
+    help="All ethnicity groups will be compared to this group"
 )
 eth_baseline_var = eth_baseline_options[eth_baseline_label]
 
@@ -198,6 +203,7 @@ race_baseline_label = st.sidebar.selectbox(
     "Race baseline",
     options=list(race_baseline_options.keys()),
     index=list(race_baseline_options.keys()).index("White"),
+    help="All racial identity groups will be compared to this group"
 )
 race_baseline_var = race_baseline_options[race_baseline_label]
 
@@ -205,8 +211,8 @@ st.sidebar.markdown("---")
 
 
 # ── Ethnicity group selection ─────────────────────────────────────────────────
-st.sidebar.subheader("Ethnicity groups")
-st.sidebar.markdown(f"Compared to **{eth_baseline_label}**.")
+st.sidebar.subheader("Which ethnicity groups do yuo want to include?")
+st.sidebar.markdown(f"Each group is compared to **{eth_baseline_label}**.")
 
 selected_eth_vars = []
 for var, label in all_ethnicity.items():
@@ -220,7 +226,7 @@ st.sidebar.markdown("---")
 
 # ── Race group selection ──────────────────────────────────────────────────────
 st.sidebar.subheader("Racial groups")
-st.sidebar.markdown(f"Compared to **{race_baseline_label}**.")
+st.sidebar.markdown(f"Each group is compared to **{race_baseline_label}**.")
 
 selected_race_vars = []
 for var, label in all_race.items():
@@ -239,7 +245,7 @@ include_age_section = st.sidebar.checkbox("Include age in the analysis", value=F
 selected_age_vars = []
 
 if include_age_section:
-    st.sidebar.markdown("**Age groups** compared to **25-34** (baseline):")
+    st.sidebar.markdown("**Age groups** compared to **35-44** (baseline):")
     for var, label in age_bins_to_show.items():
         if st.sidebar.checkbox(label, value=False, key=f"age_{var}"):
             selected_age_vars.append(var)
@@ -269,26 +275,31 @@ include_dti            = st.sidebar.checkbox("Debt-to-Income Ratio", value=True,
                                               help="How much of their income goes toward debt payments each month")
 include_ltv            = st.sidebar.checkbox("Loan-to-Value Ratio", value=True,
                                              help="How much they're borrowing compared to what the home is worth")
-include_loan_type      = st.sidebar.checkbox("Loan Type - BUT ISNT THIS A FILTER?", value=False,
-                                              help="Turn OFF to see full disparity including loan product steering effects")
-include_loan_purpose   = st.sidebar.checkbox("Loan Purpose", value=False)
-include_lien_status    = st.sidebar.checkbox("Lien Status", value=False)
-include_occupancy      = st.sidebar.checkbox("Occupancy Type", value=False)
-include_tract_minority = st.sidebar.checkbox("Neighborhood Racial Composition", value=True)
-include_conforming     = st.sidebar.checkbox("Conforming Loan Limit", value=False)
-
+# include_loan_type      = st.sidebar.checkbox("Loan Type - FILTER", value=False,
+#                                               help="Turn OFF to see full disparity including loan product steering effects")
+# include_loan_purpose   = st.sidebar.checkbox("Loan Purpose", value=False)
+# include_lien_status    = st.sidebar.checkbox("Lien Status", value=False)
+# include_occupancy      = st.sidebar.checkbox("Occupancy Type", value=False)
+include_tract_minority = st.sidebar.checkbox("Census Tract Minority Population Percent", value=True,
+                                              help="Percentage of minority population to total population for tract")
+# include_conforming     = st.sidebar.checkbox("Conforming Loan Limit", value=False)
+include_loan_amount    = st.sidebar.checkbox("Loan Amount Scaled", value=False,
+                                              help="The amount of the covered loan, or the amount applied for")
+include_property_value = st.sidebar.checkbox("Property Value Scaled", value=False,
+                                              help="The value of the property securing the covered loan")
 st.sidebar.markdown("---")
 
 
 # ── Institution and AUS chart settings ───────────────────────────────────────
-st.sidebar.subheader("Lender and AUS chart settings")
+st.sidebar.subheader("Lender and AUS chart settings",
+                    help="Adds a diamond/dot for the baseline group's predicted probability at each lender and AUS")
 
 min_applications = st.sidebar.slider(
     "Minimum applications per lender", min_value=10, max_value=500, value=50, step=10,
     help="Only show lenders with at least this many applications from the selected group"
 )
 top_n_lenders = st.sidebar.slider(
-    "Number of lenders to show", min_value=5, max_value=30, value=15, step=5,
+    "Number of lenders to show", min_value=5, max_value=30, value=5, step=5,
 )
 aus_min = st.sidebar.slider(
     "Minimum applications per AUS system", min_value=5, max_value=200, value=20, step=5,
@@ -299,23 +310,19 @@ show_comparison = st.sidebar.checkbox(
 )
 
 st.sidebar.markdown("---")
-st.sidebar.markdown(f"""
-**Baselines:**  
-Ethnicity → **{eth_baseline_label}**  
-Race → **{race_baseline_label}**  
-""")
 
 st.sidebar.markdown(f"""
 **Current comparison groups:**  \n
 Ethnicity --> compared to **{eth_baseline_label}** \n
 Race --> compared to **{race_baseline_label}** \n
-Age groups → **25-34** \n
+Age groups → **35-44** \n
 **Gender** --> I have chosen to exclude gender from this analysis because, in this data, gender had high mismatch rates between self-reported and lender-observed gender fields. This made reliable interpretation impossible without further investigation. 
 """)
 
 
-########   last two PULLED FROM MY_APP.PY NOT SAME AS REST                             ########
 ######## ── Apply dataset filters ─────────────────────────────────────────────────────########
+st.sidebar.markdown("---")
+
 df = df_raw.copy()
 
 if filter_reverse and 'reverse_mortgage' in df.columns:
@@ -364,7 +371,7 @@ else:
     st.info(f"No loan filters have been applied and we're analyzing all **{n_total:,}** applications.")
 
 
-# ── Build combined demo vars and labels ───────────────────────────────────────
+# ── Build combined demonstration variabless and labels ───────────────────────────────
 age_labels_map = {
     "applicant_age_lt25":     "Under 25",
     "applicant_age_25_34":    "25-34",
@@ -388,7 +395,7 @@ def get_demo_type(v):
     return "Age"
 
 if not demo_vars:
-    st.warning("Please select at least one group from the sidebar.")
+    st.warning("Please select at least one ethnic, race, or age group from the sidebar.")
     st.stop()
 
 
@@ -398,12 +405,14 @@ control_parts = []
 if include_income:          control_parts.append("income")
 if include_dti:             control_parts.append("C(debt_to_income_ratio)")
 if include_ltv:             control_parts.append("loan_to_value_ratio")
-if include_loan_type:       control_parts.append("C(loan_type)")
-if include_loan_purpose:    control_parts.append("C(loan_purpose)")
-if include_lien_status:     control_parts.append("C(lien_status)")
-if include_occupancy:       control_parts.append("C(occupancy_type)")
+# if include_loan_type:       control_parts.append("C(loan_type)")
+# if include_loan_purpose:    control_parts.append("C(loan_purpose)")
+# if include_lien_status:     control_parts.append("C(lien_status)")
+# if include_occupancy:       control_parts.append("C(occupancy_type)")
 if include_tract_minority:  control_parts.append("tract_minority_population_percent")
-if include_conforming:      control_parts.append("C(conforming_loan_limit)")
+# if include_conforming:      control_parts.append("C(conforming_loan_limit)")
+if include_loan_amount:     control_parts.append("loan_amount_scaled")
+if include_property_value:  control_parts.append("property_value_scaled")
 
 
 # ── Build formula and run model ───────────────────────────────────────────────
@@ -446,15 +455,15 @@ or_conf     = np.exp(conf)
 baseline_map = {
     "Ethnicity": eth_baseline_label,
     "Race":      race_baseline_label,
-    "Age":       "25-34",
+    "Age":       "35-44",
 }
 
 results_df = pd.DataFrame({
     "Group":         [var_labels[v] for v in demo_vars],
     "Type":          [get_demo_type(v) for v in demo_vars],
     "Approval Odds": odds_ratios.values,
-    "OR Low":        or_conf[0].values,
-    "OR High":       or_conf[1].values,
+    "Low Estimate":  or_conf[0].values,
+    "High Estimate": or_conf[1].values,
     "p-value":       pvalues.values,
     "Significant":   pvalues.values < 0.05,
 }).set_index("Group")
@@ -641,7 +650,7 @@ ax2.set_xlabel("Estimated probability of approval")
 ax2.set_xlim(0, 1.15)
 ax2.xaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f"{x:.0%}"))
 ax2.axvline(0.5, color='gray', linestyle=':', linewidth=0.8, alpha=0.5)
-ax2.set_title("Estimated Approval Probability - What are the chances?", fontweight='bold')
+ax2.set_title("Estimated Approval Probability", fontweight='bold')
 ax2.legend(fontsize=8, loc="lower right")
 
 plt.tight_layout()
@@ -657,7 +666,7 @@ with st.expander("See full results table"):
         "Odds Ratio":        results_df["Approval Odds"].round(3),
         "Est. Probability":  [f"{group_probs.get(g, np.nan):.1%}" for g in results_df.index],
         "p-value":           results_df["p-value"].round(4),
-        "Statistically Significant?":       results_df["Significant"].map({True: "✅ Yes", False: "❌ Not sure"}),
+        "Statistically Significant?":       results_df["Significant"].map({True: "✅ Yes", False: "❌ No"}),
     })
     st.dataframe(
         display_df.style.apply(
@@ -699,8 +708,8 @@ elif focus_type == "Race":
     comparison_var   = race_baseline_var
     comparison_label = race_baseline_label
 else:
-    comparison_var   = "applicant_age_25_34"
-    comparison_label = "25-34"
+    comparison_var   = "applicant_age_35_44"
+    comparison_label = "35-44"
 
 # Filter df to focus group
 focus_df = df[df[focus_var] == 1].copy() if focus_var in df.columns else pd.DataFrame()
