@@ -10,6 +10,7 @@ import numpy as np
 import statsmodels.formula.api as smf
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
+import plotly.graph_objects as go
 
 # ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -574,7 +575,7 @@ ax1.set_yticks(range(len(demo_vars)))
 ax1.set_yticklabels(labels_ordered)
 ax1.set_xlabel("Approval odds relative to baseline\n(below 1.0 = worse odds  |  above 1.0 = better odds)")
 ax1.set_xlim(x_min, x_max)
-ax1.set_title("Odds Ratio - How much better or worse compared to the baseline?", fontweight='bold')
+ax1.set_title("Odds Ratio", fontweight='bold')
 
 sig_patch  = mpatches.Patch(color="#c0392b",   label="Statistically significant difference (p < 0.05)")
 eth_patch  = mpatches.Patch(color="steelblue", label="Ethnicity")
@@ -772,44 +773,77 @@ else:
             lender_height = st.number_input("Lender chart height", min_value=4, max_value=24,
                                             value=max(5, int(len(bottom_lenders) * 0.5 + 2)), step=1, key="lh")
 
-        fig3, ax3 = plt.subplots(figsize=(lender_width, lender_height))
-        y_pos = range(len(bottom_lenders))
 
-        ax3.barh(y_pos, bottom_lenders['pred_prob'],
-                 color="#c0392b", height=0.5,
-                 label=f"{focus_label}", zorder=2)
-
-        if show_comparison and 'comp_pred_prob' in bottom_lenders.columns:
-            ax3.scatter(
-                bottom_lenders['comp_pred_prob'], y_pos,
-                color="steelblue", zorder=3, s=60,
-                label=f"{comparison_label} (comparison)",
-                marker='D'
+        # !!!!1111
+        lender_height_px = max(300, len(bottom_lenders) * 40 + 100)
+        fig3 = go.Figure()
+        fig3.add_trace(go.Bar(
+            x=bottom_lenders['pred_prob'],
+            y=bottom_lenders['institution'],
+            orientation='h',
+            name=focus_label,
+            marker_color='#c0392b',
+            customdata=np.stack([
+                bottom_lenders['institution'],
+                bottom_lenders['pred_prob'].apply(lambda x: f"{x:.1%}"),
+                bottom_lenders['n_applications'].astype(int),
+            ], axis=-1),
+            hovertemplate=(
+                "<b>%{customdata[0]}</b><br>"
+                f"Group: {focus_label}<br>"
+                "Predicted Probability: %{customdata[1]}<br>"
+                "Applications: %{customdata[2]:,}<br>"
+                "<extra></extra>"
             )
+        ))
 
-        for i, (_, row) in enumerate(bottom_lenders.iterrows()):
-            prob = row['pred_prob']
-            n    = int(row['n_applications'])
-            ax3.text(prob + 0.005, i, f"{prob:.1%}  (n={n:,})", va='center', fontsize=8)
-
-        ax3.set_yticks(list(y_pos))
-        ax3.set_yticklabels(bottom_lenders['institution'], fontsize=9)
-        ax3.set_xlabel("Average predicted probability of approval")
-        ax3.set_xlim(0, 1.2)
-        ax3.xaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f"{x:.0%}"))
-        ax3.set_title(
-            f"Lenders — Lowest Predicted Approval Probability for {focus_label}\n"
-            f"(minimum {min_applications:,} applications | bottom {len(bottom_lenders)})",
-            fontweight='bold'
+        # ?????????????????
+        if show_comparison and 'comp_pred_prob' in bottom_lenders.columns:
+            comp_n_col = bottom_lenders['comp_n'].astype(int) if 'comp_n' in bottom_lenders.columns else [0] * len(bottom_lenders)
+            gap = bottom_lenders['comp_pred_prob'] - bottom_lenders['pred_prob']
+            fig3.add_trace(go.Scatter(
+                x=bottom_lenders['comp_pred_prob'],
+                y=bottom_lenders['institution'],
+                mode='markers',
+                name=f"{comparison_label} (comparison)",
+                marker=dict(color='steelblue', size=12, symbol='diamond'),
+                customdata=np.stack([
+                    bottom_lenders['institution'],
+                    bottom_lenders['comp_pred_prob'].apply(lambda x: f"{x:.1%}" if pd.notna(x) else "N/A"),
+                    comp_n_col,
+                    bottom_lenders['pred_prob'].apply(lambda x: f"{x:.1%}"),
+                    gap.apply(lambda x: f"+{x:.1%}" if x > 0 else f"{x:.1%}"),
+                ], axis=-1),
+                hovertemplate=(
+                    "<b>%{customdata[0]}</b><br>"
+                    f"Group: {comparison_label}<br>"
+                    "Predicted Probability: %{customdata[1]}<br>"
+                    "Applications: %{customdata[2]:,}<br>"
+                    "───────────────<br>"
+                    f"{focus_label}: %{{customdata[3]}}<br>"
+                    "Gap (baseline minus group): %{customdata[4]}<br>"
+                    "<extra></extra>"
+                )
+            ))
+        
+        
+        fig3.add_vline(x=0.5, line_dash="dot", line_color="gray", opacity=0.5)
+        fig3.update_layout(
+            title=dict(
+                text=f"Lenders — Lowest Predicted Approval Probability for {focus_label}<br>"
+                     f"<sup>(minimum {min_applications:,} applications | bottom {len(bottom_lenders)})</sup>",
+                font=dict(size=14)
+            ),
+            xaxis=dict(title="Average predicted probability of approval", tickformat=".0%", range=[0, 1.15]),
+            yaxis=dict(title=""),
+            height=lender_height_px,
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            hoverlabel=dict(bgcolor="#2c3e50", font_color="white", font_size=13, bordercolor="#2c3e50"),
+            bargap=0.3,
         )
-        ax3.axvline(0.5, color='gray', linestyle=':', linewidth=0.8, alpha=0.5)
-        ax3.legend(fontsize=9, loc='lower right')
-        ax3.grid(axis='x', alpha=0.3)
-
-        plt.tight_layout()
-        st.pyplot(fig3)
-        plt.close()
-
+        st.plotly_chart(fig3, use_container_width=True)
+        
+        
         overall_pred = focus_df['predicted_prob'].mean()
         st.markdown(f"""
         **Average predicted approval probability for {focus_label} across all lenders:** {overall_pred:.1%}  
@@ -908,44 +942,78 @@ else:
                 aus_height = st.number_input("AUS chart height", min_value=3, max_value=16,
                                              value=max(4, int(len(aus_stats) * 0.8 + 1.5)), step=1, key="ah")
 
-            fig4, ax4 = plt.subplots(figsize=(aus_width, aus_height))
-            y_pos = range(len(aus_stats))
-
-            ax4.barh(y_pos, aus_stats['pred_prob'],
-                     color="#9b59b6", height=0.5,
-                     label=f"{focus_label}", zorder=2)
+         
+            aus_height_px = max(250, len(aus_stats) * 60 + 100)
+            fig4 = go.Figure()
+            fig4.add_trace(go.Bar(
+                x=aus_stats['pred_prob'],
+                y=aus_stats['aus_name'],
+                orientation='h',
+                name=focus_label,
+                marker_color='#9b59b6',
+                customdata=np.stack([
+                    aus_stats['aus_name'],
+                    aus_stats['pred_prob'].apply(lambda x: f"{x:.1%}"),
+                    aus_stats['n_applications'].astype(int),
+                ], axis=-1),
+                hovertemplate=(
+                    "<b>%{customdata[0]}</b><br>"
+                    f"Group: {focus_label}<br>"
+                    "Predicted Probability: %{customdata[1]}<br>"
+                    "Applications: %{customdata[2]:,}<br>"
+                    "<extra></extra>"
+                )
+            ))
 
             if show_comparison and 'comp_pred_prob' in aus_stats.columns:
-                ax4.scatter(
-                    aus_stats['comp_pred_prob'], y_pos,
-                    color="steelblue", zorder=3, s=60,
-                    label=f"{comparison_label} (comparison)",
-                    marker='D'
-                )
+                aus_comp_n = aus_stats['comp_n'].astype(int) if 'comp_n' in aus_stats.columns else [0] * len(aus_stats)
+                aus_gap = aus_stats['comp_pred_prob'] - aus_stats['pred_prob']
+                fig4.add_trace(go.Scatter(
+                    x=aus_stats['comp_pred_prob'],
+                    y=aus_stats['aus_name'],
+                    mode='markers',
+                    name=f"{comparison_label} (comparison)",
+                    marker=dict(color='steelblue', size=14, symbol='diamond'),
+                    customdata=np.stack([
+                        aus_stats['aus_name'],
+                        aus_stats['comp_pred_prob'].apply(lambda x: f"{x:.1%}" if pd.notna(x) else "N/A"),
+                        aus_comp_n,
+                        aus_stats['pred_prob'].apply(lambda x: f"{x:.1%}"),
+                        aus_gap.apply(lambda x: f"+{x:.1%}" if x > 0 else f"{x:.1%}"),
+                    ], axis=-1),
+                    hovertemplate=(
+                        "<b>%{customdata[0]}</b><br>"
+                        f"Group: {comparison_label}<br>"
+                        "Predicted Probability: %{customdata[1]}<br>"
+                        "Applications: %{customdata[2]:,}<br>"
+                        "───────────────<br>"
+                        f"{focus_label}: %{{customdata[3]}}<br>"
+                        "Gap (baseline minus group): %{customdata[4]}<br>"
+                        "<extra></extra>"
+                    )
+                ))
+            
+            
 
-            for i, (_, row) in enumerate(aus_stats.iterrows()):
-                prob = row['pred_prob']
-                n    = int(row['n_applications'])
-                ax4.text(prob + 0.005, i, f"{prob:.1%}  (n={n:,})", va='center', fontsize=9)
-
-            ax4.set_yticks(list(y_pos))
-            ax4.set_yticklabels(aus_stats['aus_name'], fontsize=9)
-            ax4.set_xlabel("Average predicted probability of approval (lowest to highest)")
-            ax4.set_xlim(0, 1.2)
-            ax4.xaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f"{x:.0%}"))
-            ax4.set_title(
-                f"AUS — Predicted Approval Probability for {focus_label}\n"
-                f"(minimum {aus_min} applications | ordered lowest to highest)",
-                fontweight='bold'
+            fig4.add_vline(x=0.5, line_dash="dot", line_color="gray", opacity=0.5)
+            fig4.update_layout(
+                title=dict(
+                    text=f"AUS — Predicted Approval Probability for {focus_label}<br>"
+                         f"<sup>(minimum {aus_min} applications | ordered lowest to highest)</sup>",
+                    font=dict(size=14)
+                ),
+                xaxis=dict(title="Average predicted probability of approval (lowest to highest)", tickformat=".0%", range=[0, 1.15]),
+                yaxis=dict(title=""),
+                height=aus_height_px,
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                hoverlabel=dict(bgcolor="#2c3e50", font_color="white", font_size=13, bordercolor="#2c3e50"),
+                bargap=0.3,
             )
-            ax4.axvline(0.5, color='gray', linestyle=':', linewidth=0.8, alpha=0.5)
-            ax4.legend(fontsize=9, loc='lower right')
-            ax4.grid(axis='x', alpha=0.3)
-
-            plt.tight_layout()
-            st.pyplot(fig4)
-            plt.close()
-
+            st.plotly_chart(fig4, use_container_width=True)
+            
+            
+            
+            
             best_aus  = aus_stats.iloc[-1]
             worst_aus = aus_stats.iloc[0]
             st.markdown(f"""
