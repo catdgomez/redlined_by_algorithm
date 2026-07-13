@@ -72,6 +72,13 @@ with st.expander("What's the break down?"):
     """)
 
 
+# ── debugging ─────────────────────────────────────────────────────────────────
+
+import os
+st.write("Files in current directory:", os.listdir("."))
+st.write("Current directory:", os.getcwd())
+
+
 # ── Read in the data ──────────────────────────────────────────────────────────
 @st.cache_data
 def load_data():
@@ -81,7 +88,7 @@ def load_data():
 try:
     df_raw = load_data()
 except FileNotFoundError:
-    st.error("Data file not found. Make sure `hmda_all_nf.csv` is in the same folder as this app file.")
+    st.error("Data file not found. Make sure `hmda_all_nf.csv.gz` is in the same folder as this app file.")
     st.stop()
 except Exception as e:
     st.error(f"Something went wrong loading the data: {e}")
