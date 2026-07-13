@@ -11,7 +11,6 @@ import statsmodels.formula.api as smf
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import plotly.graph_objects as go
-import os
 
 # ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -73,16 +72,10 @@ with st.expander("What's the break down?"):
     """)
 
 
-
-
-
 # ── Read in the data ──────────────────────────────────────────────────────────
 @st.cache_data
 def load_data():
-    # Get the directory where this app file lives
-    app_dir = os.path.dirname(os.path.abspath(__file__))
-    data_path = os.path.join(app_dir, "hmda_all_nf.csv.gz")
-    df = pd.read_csv(data_path, low_memory=False)
+    df = pd.read_csv("hmda_all_nf.csv.gz")
     return df
 
 try:
@@ -898,33 +891,7 @@ else:
                 )
             ))
 
-        # if show_comparison and 'comp_approval_rate' in bottom_lenders.columns:
-        #     comp_n_col = bottom_lenders['comp_n'].astype(int) if 'comp_n' in bottom_lenders.columns else [0] * len(bottom_lenders)
-        #     gap = bottom_lenders['comp_approval_rate'] - bottom_lenders['approval_rate']
-        #     fig3.add_trace(go.Scatter(
-        #         x=bottom_lenders['comp_approval_rate'],
-        #         y=bottom_lenders['institution'],
-        #         mode='markers',
-        #         name=f"{comparison_label} (comparison)",
-        #         marker=dict(color='steelblue', size=12, symbol='diamond'),
-        #         customdata=np.stack([
-        #             bottom_lenders['institution'],
-        #             bottom_lenders['comp_approval_rate'].apply(lambda x: f"{x:.1%}" if pd.notna(x) else "N/A"),
-        #             comp_n_col,
-        #             bottom_lenders['approval_rate'].apply(lambda x: f"{x:.1%}"),
-        #             gap.apply(lambda x: f"+{x:.1%}" if x > 0 else f"{x:.1%}"),
-        #         ], axis=-1),
-        #         hovertemplate=(
-        #             "<b>%{customdata[0]}</b><br>"
-        #             f"Group: {comparison_label}<br>"
-        #             "Approval Rate: %{customdata[1]}<br>"
-        #             "Applications: %{customdata[2]:,}<br>"
-        #             "───────────────<br>"
-        #             f"{focus_label}: %{{customdata[3]}}<br>"
-        #             "Gap (baseline minus group): %{customdata[4]}<br>"
-        #             "<extra></extra>"
-        #         )
-        #     ))
+
 
         fig3.add_vline(x=0.5, line_dash="dot", line_color="gray", opacity=0.5)
         fig3.update_layout(
@@ -1135,34 +1102,6 @@ else:
                     )
                 ))
             
-
-            # if show_comparison and 'comp_approval_rate' in aus_stats.columns:
-            #     aus_comp_n = aus_stats['comp_n'].astype(int) if 'comp_n' in aus_stats.columns else [0] * len(aus_stats)
-            #     aus_gap = aus_stats['comp_approval_rate'] - aus_stats['approval_rate']
-            #     fig4.add_trace(go.Scatter(
-            #         x=aus_stats['comp_approval_rate'],
-            #         y=aus_stats['aus_name'],
-            #         mode='markers',
-            #         name=f"{comparison_label} (comparison)",
-            #         marker=dict(color='steelblue', size=14, symbol='diamond'),
-            #         customdata=np.stack([
-            #             aus_stats['aus_name'],
-            #             aus_stats['comp_approval_rate'].apply(lambda x: f"{x:.1%}" if pd.notna(x) else "N/A"),
-            #             aus_comp_n,
-            #             aus_stats['approval_rate'].apply(lambda x: f"{x:.1%}"),
-            #             aus_gap.apply(lambda x: f"+{x:.1%}" if x > 0 else f"{x:.1%}"),
-            #         ], axis=-1),
-            #         hovertemplate=(
-            #             "<b>%{customdata[0]}</b><br>"
-            #             f"Group: {comparison_label}<br>"
-            #             "Approval Rate: %{customdata[1]}<br>"
-            #             "Applications: %{customdata[2]:,}<br>"
-            #             "───────────────<br>"
-            #             f"{focus_label}: %{{customdata[3]}}<br>"
-            #             "Gap (baseline minus group): %{customdata[4]}<br>"
-            #             "<extra></extra>"
-            #         )
-            #     ))
 
             fig4.update_layout(
                 title=dict(
