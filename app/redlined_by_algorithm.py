@@ -11,6 +11,7 @@ import statsmodels.formula.api as smf
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import plotly.graph_objects as go
+import os
 
 # ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -72,17 +73,16 @@ with st.expander("What's the break down?"):
     """)
 
 
-# ── debugging ─────────────────────────────────────────────────────────────────
 
-import os
-st.write("Files in current directory:", os.listdir("."))
-st.write("Current directory:", os.getcwd())
 
 
 # ── Read in the data ──────────────────────────────────────────────────────────
 @st.cache_data
 def load_data():
-    df = pd.read_csv("hmda_all_nf.csv.gz")
+    # Get the directory where this app file lives
+    app_dir = os.path.dirname(os.path.abspath(__file__))
+    data_path = os.path.join(app_dir, "hmda_all_nf.csv.gz")
+    df = pd.read_csv(data_path)
     return df
 
 try:
