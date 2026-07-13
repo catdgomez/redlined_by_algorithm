@@ -75,7 +75,7 @@ with st.expander("What's the break down?"):
 # ── Read in the data ──────────────────────────────────────────────────────────
 @st.cache_data
 def load_data():
-    df = pd.read_csv("hmda_all_nf.csv.gz")
+    df = pd.read_csv("./app/hmda_all_nf.csv.gz")
     return df
 
 try:
@@ -185,28 +185,19 @@ st.sidebar.markdown("---")
 # ── Baseline selection ────────────────────────────────────────────────────────
 st.sidebar.subheader("Who is the comparison group or the baseline")
 st.sidebar.markdown("""
-The **comparison group**, or baseline, is who everyone else gets compared to. 
+The **comparison group**, or baseline, is who everyone else gets compared to.
 All approval odds in the chart are shown relative to this group.
+
+- **Ethnicity:** Not Hispanic or Latino
+- **Race:** White
+- **Age:** 35-44
 """)
 
-eth_baseline_options  = {v: k for k, v in all_ethnicity.items()}
-race_baseline_options = {v: k for k, v in all_race.items()}
-
-eth_baseline_label = st.sidebar.selectbox(
-    "Ethnicity baseline",
-    options=list(eth_baseline_options.keys()),
-    index=list(eth_baseline_options.keys()).index("Not Hispanic or Latino"),
-    help="All ethnicity groups will be compared to this group"
-)
-eth_baseline_var = eth_baseline_options[eth_baseline_label]
-
-race_baseline_label = st.sidebar.selectbox(
-    "Race baseline",
-    options=list(race_baseline_options.keys()),
-    index=list(race_baseline_options.keys()).index("White"),
-    help="All racial identity groups will be compared to this group"
-)
-race_baseline_var = race_baseline_options[race_baseline_label]
+# Hardcoded baselines
+eth_baseline_label = "Not Hispanic or Latino"
+eth_baseline_var   = "ae_values_2"
+race_baseline_label = "White"
+race_baseline_var   = "ar_values_5"
 
 st.sidebar.markdown("---")
 
@@ -260,11 +251,21 @@ st.sidebar.markdown("---")
 
 # ── Target variable ───────────────────────────────────────────────────────────
 st.sidebar.subheader("Target Variable or Outcome to predict")
-target_options = {"Approved and Originated vs. Denied": "approved_originated_or_denied"}
-target_label = st.sidebar.selectbox("Target Variable", options=list(target_options.keys()), index=0)
-target_var = target_options.get(target_label, target_label)
+st.sidebar.markdown("**Approved and Originated vs. Denied**")
+
+# Hardcoded target variable
+target_var = "approved_originated_or_denied"
 
 st.sidebar.markdown("---")
+
+
+
+# st.sidebar.subheader("Target Variable or Outcome to predict")
+# target_options = {"Approved and Originated vs. Denied": "approved_originated_or_denied"}
+# target_label = st.sidebar.selectbox("Target Variable", options=list(target_options.keys()), index=0)
+# target_var = target_options.get(target_label, target_label)
+
+# st.sidebar.markdown("---")
 
 # ── Control variable checkboxes ──────────────────────────────────────────────────
 st.sidebar.subheader("Financial factors to hold constant")
@@ -318,7 +319,6 @@ Age groups → **35-44** \n
 
 
 ######## ── Apply dataset filters ─────────────────────────────────────────────────────########
-st.sidebar.markdown("---")
 
 df = df_raw.copy()
 
