@@ -75,7 +75,7 @@ with st.expander("What's the break down?"):
 # ── Read in the data ──────────────────────────────────────────────────────────
 @st.cache_data
 def load_data():
-    df = pd.read_csv("hmda_all_nf.csv")
+    df = pd.read_csv("hmda_all_nf.csv.gz")
     return df
 
 try:
@@ -283,11 +283,7 @@ include_ltv            = st.sidebar.checkbox("Loan-to-Value Ratio", value=True,
 # include_occupancy      = st.sidebar.checkbox("Occupancy Type", value=False)
 include_tract_minority = st.sidebar.checkbox("Census Tract Minority Population Percent", value=True,
                                               help="Percentage of minority population to total population for tract")
-# include_conforming     = st.sidebar.checkbox("Conforming Loan Limit", value=False)
-include_loan_amount    = st.sidebar.checkbox("Loan Amount Scaled", value=False,
-                                              help="The amount of the covered loan, or the amount applied for")
-include_property_value = st.sidebar.checkbox("Property Value Scaled", value=False,
-                                              help="The value of the property securing the covered loan")
+
 st.sidebar.markdown("---")
 
 
@@ -411,9 +407,33 @@ if include_ltv:             control_parts.append("loan_to_value_ratio")
 # if include_lien_status:     control_parts.append("C(lien_status)")
 # if include_occupancy:       control_parts.append("C(occupancy_type)")
 if include_tract_minority:  control_parts.append("tract_minority_population_percent")
-# if include_conforming:      control_parts.append("C(conforming_loan_limit)")
-if include_loan_amount:     control_parts.append("loan_amount_scaled")
-if include_property_value:  control_parts.append("property_value_scaled")
+
+
+
+# ── Confidence Intevals for Chart 3 and 4 ────────────────────────────────────
+def get_pred_prob_ci(result, df, alpha=0.05):
+    import patsy
+    from scipy import stats
+
+    _, X = patsy.dmatrices(formula, data=df, return_type='dataframe')
+
+    lp     = X.values @ result.params.values
+    lp_var = (X.values * (X.values @ result.cov_params().values)).sum(axis=1)
+    lp_se  = np.sqrt(lp_var)
+
+    z        = stats.norm.ppf(1 - alpha / 2)
+    lp_lower = lp - z * lp_se
+    lp_upper = lp + z * lp_se
+
+    prob_lower = 1 / (1 + np.exp(-lp_lower))
+    prob_upper = 1 / (1 + np.exp(-lp_upper))
+
+    # Build a Series indexed to the rows patsy actually used
+    idx        = X.index
+    lower_s    = pd.Series(prob_lower, index=idx)
+    upper_s    = pd.Series(prob_upper, index=idx)
+
+    return lower_s, upper_s
 
 
 # ── Build formula and run model ───────────────────────────────────────────────
@@ -443,6 +463,12 @@ if not converged:
 
 # ── Add predicted probabilities to the dataframe ──────────────────────────────
 df['predicted_prob'] = result.predict(df)
+
+
+# ── Re: Confidence Intervals in Charts 3 and 4 ────────────────────────────────
+prob_lower, prob_upper = get_pred_prob_ci(result, df)
+df['pred_prob_lower'] = prob_lower
+df['pred_prob_upper'] = prob_upper
 
 
 # ── Extract model results ─────────────────────────────────────────────────────
@@ -722,10 +748,11 @@ comp_df = df[df[comparison_var] == 1].copy() if comparison_var in df.columns els
 # ══════════════════════════════════════════════════════════════════════════════
 # ── CHART 3: LENDER PREDICTED PROBABILITIES ───────────────────────────────────
 # ══════════════════════════════════════════════════════════════════════════════
-st.subheader("Chart 3 - Lenders with the Lowest Predicted Approval Probabilities")
+
+st.subheader("Chart 3 - Lenders with the Lowest Approval Rates")
 st.markdown(f"""
-Average predicted probability of approval for **{focus_label}** applicants at each lender,  
-ordered from lowest to highest. Based on the model's predictions for each application - not raw approval rates.
+Raw approval rate for **{focus_label}** applicants at each lender with 95% confidence intervals,  
+ordered from lowest to highest. This is the observed approval percentage — not model-based.
 """)
 
 if 'lei' not in df.columns:
@@ -733,19 +760,33 @@ if 'lei' not in df.columns:
 elif focus_df.empty:
     st.warning(f"No applications found for {focus_label} in the current dataset.")
 else:
-    # Average predicted prob by lender for focus group
+    from scipy import stats as scipy_stats
+
+    def approval_rate_with_ci(x, alpha=0.05):
+        n  = len(x)
+        p  = x.mean()
+        z  = scipy_stats.norm.ppf(1 - alpha / 2)
+        se = np.sqrt(p * (1 - p) / n)
+        return pd.Series({
+            'approval_rate':  p,
+            'ci_lower':       max(0, p - z * se),
+            'ci_upper':       min(1, p + z * se),
+            'n_applications': n,
+        })
+
+    # Raw approval rates by lender for focus group
     lender_stats = (
-        focus_df.groupby('lei')['predicted_prob']
-        .agg(['mean', 'count'])
+        focus_df.groupby('lei')[target_var]
+        .apply(approval_rate_with_ci)
+        .unstack()
         .reset_index()
     )
-    lender_stats.columns = ['lei', 'pred_prob', 'n_applications']
     lender_stats = lender_stats[lender_stats['n_applications'] >= min_applications]
 
     if lender_stats.empty:
         st.warning(f"No lenders have at least {min_applications} applications from {focus_label}. Try lowering the minimum applications slider.")
     else:
-        bottom_lenders = lender_stats.nsmallest(top_n_lenders, 'pred_prob')
+        bottom_lenders = lender_stats.nsmallest(top_n_lenders, 'approval_rate')
 
         # Add institution names
         if panel_df is not None:
@@ -754,70 +795,94 @@ else:
         else:
             bottom_lenders['institution'] = bottom_lenders['lei']
 
-        # Comparison group predicted prob by lender
+        # Comparison group raw approval rates
         if show_comparison and not comp_df.empty:
             comp_lender_stats = (
-                comp_df.groupby('lei')['predicted_prob']
-                .agg(['mean', 'count'])
+                comp_df.groupby('lei')[target_var]
+                .apply(approval_rate_with_ci)
+                .unstack()
                 .reset_index()
             )
-            comp_lender_stats.columns = ['lei', 'comp_pred_prob', 'comp_n']
-            bottom_lenders = bottom_lenders.merge(comp_lender_stats, on='lei', how='left')
+            comp_lender_stats = comp_lender_stats.rename(columns={
+                'approval_rate':  'comp_approval_rate',
+                'ci_lower':       'comp_ci_lower',
+                'ci_upper':       'comp_ci_upper',
+                'n_applications': 'comp_n',
+            })
+            bottom_lenders = bottom_lenders.merge(
+                comp_lender_stats[['lei', 'comp_approval_rate', 'comp_ci_lower', 'comp_ci_upper', 'comp_n']],
+                on='lei', how='left'
+            )
 
-        bottom_lenders = bottom_lenders.sort_values('pred_prob', ascending=True)
+        bottom_lenders = bottom_lenders.sort_values('approval_rate', ascending=True)
 
-        lc1, lc2 = st.columns(2)
-        with lc1:
-            lender_width  = st.number_input("Lender chart width",  min_value=6, max_value=24, value=12, step=1, key="lw")
-        with lc2:
-            lender_height = st.number_input("Lender chart height", min_value=4, max_value=24,
-                                            value=max(5, int(len(bottom_lenders) * 0.5 + 2)), step=1, key="lh")
-
-
-        # !!!!1111
         lender_height_px = max(300, len(bottom_lenders) * 40 + 100)
         fig3 = go.Figure()
+
         fig3.add_trace(go.Bar(
-            x=bottom_lenders['pred_prob'],
+            x=bottom_lenders['approval_rate'],
             y=bottom_lenders['institution'],
             orientation='h',
             name=focus_label,
             marker_color='#c0392b',
+            error_x=dict(
+                type='data',
+                symmetric=False,
+                array=(bottom_lenders['ci_upper'] - bottom_lenders['approval_rate']).clip(lower=0),
+                arrayminus=(bottom_lenders['approval_rate'] - bottom_lenders['ci_lower']).clip(lower=0),
+                color='rgba(0,0,0,0.4)',
+                thickness=1.5,
+                width=4,
+            ),
             customdata=np.stack([
                 bottom_lenders['institution'],
-                bottom_lenders['pred_prob'].apply(lambda x: f"{x:.1%}"),
+                bottom_lenders['approval_rate'].apply(lambda x: f"{x:.1%}"),
                 bottom_lenders['n_applications'].astype(int),
+                bottom_lenders['ci_lower'].apply(lambda x: f"{x:.1%}"),
+                bottom_lenders['ci_upper'].apply(lambda x: f"{x:.1%}"),
             ], axis=-1),
             hovertemplate=(
                 "<b>%{customdata[0]}</b><br>"
                 f"Group: {focus_label}<br>"
-                "Predicted Probability: %{customdata[1]}<br>"
+                "Approval Rate: %{customdata[1]}<br>"
+                "95% CI: %{customdata[3]} – %{customdata[4]}<br>"
                 "Applications: %{customdata[2]:,}<br>"
                 "<extra></extra>"
             )
         ))
 
-        # ?????????????????
-        if show_comparison and 'comp_pred_prob' in bottom_lenders.columns:
+        if show_comparison and 'comp_approval_rate' in bottom_lenders.columns:
             comp_n_col = bottom_lenders['comp_n'].astype(int) if 'comp_n' in bottom_lenders.columns else [0] * len(bottom_lenders)
-            gap = bottom_lenders['comp_pred_prob'] - bottom_lenders['pred_prob']
+            gap = bottom_lenders['comp_approval_rate'] - bottom_lenders['approval_rate']
             fig3.add_trace(go.Scatter(
-                x=bottom_lenders['comp_pred_prob'],
+                x=bottom_lenders['comp_approval_rate'],
                 y=bottom_lenders['institution'],
                 mode='markers',
                 name=f"{comparison_label} (comparison)",
                 marker=dict(color='steelblue', size=12, symbol='diamond'),
+                error_x=dict(
+                    type='data',
+                    symmetric=False,
+                    array=(bottom_lenders['comp_ci_upper'] - bottom_lenders['comp_approval_rate']).clip(lower=0),
+                    arrayminus=(bottom_lenders['comp_approval_rate'] - bottom_lenders['comp_ci_lower']).clip(lower=0),
+                    color='steelblue',
+                    thickness=1.5,
+                    width=4,
+                ),
                 customdata=np.stack([
                     bottom_lenders['institution'],
-                    bottom_lenders['comp_pred_prob'].apply(lambda x: f"{x:.1%}" if pd.notna(x) else "N/A"),
+                    bottom_lenders['comp_approval_rate'].apply(lambda x: f"{x:.1%}" if pd.notna(x) else "N/A"),
                     comp_n_col,
-                    bottom_lenders['pred_prob'].apply(lambda x: f"{x:.1%}"),
+                    bottom_lenders['approval_rate'].apply(lambda x: f"{x:.1%}"),
                     gap.apply(lambda x: f"+{x:.1%}" if x > 0 else f"{x:.1%}"),
+                    bottom_lenders['comp_ci_lower'].apply(lambda x: f"{x:.1%}" if pd.notna(x) else "N/A"),
+                    bottom_lenders['comp_ci_upper'].apply(lambda x: f"{x:.1%}" if pd.notna(x) else "N/A"),
                 ], axis=-1),
                 hovertemplate=(
                     "<b>%{customdata[0]}</b><br>"
                     f"Group: {comparison_label}<br>"
-                    "Predicted Probability: %{customdata[1]}<br>"
+                    "Approval Rate: %{customdata[1]}<br>"
+                    "95% CI: %{customdata[5]} – %{customdata[6]}<br>"
                     "Applications: %{customdata[2]:,}<br>"
                     "───────────────<br>"
                     f"{focus_label}: %{{customdata[3]}}<br>"
@@ -825,35 +890,66 @@ else:
                     "<extra></extra>"
                 )
             ))
-        
-        
+
+        # if show_comparison and 'comp_approval_rate' in bottom_lenders.columns:
+        #     comp_n_col = bottom_lenders['comp_n'].astype(int) if 'comp_n' in bottom_lenders.columns else [0] * len(bottom_lenders)
+        #     gap = bottom_lenders['comp_approval_rate'] - bottom_lenders['approval_rate']
+        #     fig3.add_trace(go.Scatter(
+        #         x=bottom_lenders['comp_approval_rate'],
+        #         y=bottom_lenders['institution'],
+        #         mode='markers',
+        #         name=f"{comparison_label} (comparison)",
+        #         marker=dict(color='steelblue', size=12, symbol='diamond'),
+        #         customdata=np.stack([
+        #             bottom_lenders['institution'],
+        #             bottom_lenders['comp_approval_rate'].apply(lambda x: f"{x:.1%}" if pd.notna(x) else "N/A"),
+        #             comp_n_col,
+        #             bottom_lenders['approval_rate'].apply(lambda x: f"{x:.1%}"),
+        #             gap.apply(lambda x: f"+{x:.1%}" if x > 0 else f"{x:.1%}"),
+        #         ], axis=-1),
+        #         hovertemplate=(
+        #             "<b>%{customdata[0]}</b><br>"
+        #             f"Group: {comparison_label}<br>"
+        #             "Approval Rate: %{customdata[1]}<br>"
+        #             "Applications: %{customdata[2]:,}<br>"
+        #             "───────────────<br>"
+        #             f"{focus_label}: %{{customdata[3]}}<br>"
+        #             "Gap (baseline minus group): %{customdata[4]}<br>"
+        #             "<extra></extra>"
+        #         )
+        #     ))
+
         fig3.add_vline(x=0.5, line_dash="dot", line_color="gray", opacity=0.5)
         fig3.update_layout(
             title=dict(
-                text=f"Lenders — Lowest Predicted Approval Probability for {focus_label}<br>"
-                     f"<sup>(minimum {min_applications:,} applications | bottom {len(bottom_lenders)})</sup>",
-                font=dict(size=14)
+                text=f"Lenders — Lowest Raw Approval Rate for {focus_label}<br>"
+                     f"<sup>(minimum {min_applications:,} applications | bottom {len(bottom_lenders)} | 95% CI shown)</sup>",
+                font=dict(size=14, color="black")
             ),
-            xaxis=dict(title="Average predicted probability of approval", tickformat=".0%", range=[0, 1.15]),
-            yaxis=dict(title=""),
+            xaxis=dict(title="Raw approval rate (% of applications approved)", tickformat=".0%", range=[0, 1.15],
+                       tickfont=dict(color="black"), title_font=dict(color="black")),
+            yaxis=dict(title="", tickfont=dict(color="black")),
             height=lender_height_px,
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(color="black")),
             hoverlabel=dict(bgcolor="#2c3e50", font_color="white", font_size=13, bordercolor="#2c3e50"),
             bargap=0.3,
+            paper_bgcolor="white",
+            plot_bgcolor="white",
+            font=dict(color="black"),
         )
         st.plotly_chart(fig3, use_container_width=True)
-        
-        
-        overall_pred = focus_df['predicted_prob'].mean()
+
+        overall_rate = focus_df[target_var].mean()
         st.markdown(f"""
-        **Average predicted approval probability for {focus_label} across all lenders:** {overall_pred:.1%}  
-        **Lowest in this list:** {bottom_lenders['pred_prob'].min():.1%} — {bottom_lenders.iloc[0]['institution']}  
-        **Highest in this list:** {bottom_lenders['pred_prob'].max():.1%} — {bottom_lenders.iloc[-1]['institution']}
+        **Overall raw approval rate for {focus_label} across all lenders:** {overall_rate:.1%}  
+        **Lowest in this list:** {bottom_lenders['approval_rate'].min():.1%} — {bottom_lenders.iloc[0]['institution']}  
+        **Highest in this list:** {bottom_lenders['approval_rate'].max():.1%} — {bottom_lenders.iloc[-1]['institution']}
         """)
 
-        download_df = bottom_lenders[['lei', 'institution', 'pred_prob', 'n_applications']].copy()
-        download_df.columns = ['LEI', 'Institution', 'Predicted Probability', 'Applications']
-        download_df['Predicted Probability'] = download_df['Predicted Probability'].apply(lambda x: f"{x:.1%}")
+        download_df = bottom_lenders[['lei', 'institution', 'approval_rate', 'n_applications']].copy()
+        download_df.columns = ['LEI', 'Institution', 'Approval Rate', 'Applications']
+        download_df['Approval Rate'] = download_df['Approval Rate'].apply(lambda x: f"{x:.1%}")
+
         st.download_button(
             label="Download lender data as CSV",
             data=download_df.to_csv(index=False),
@@ -862,16 +958,15 @@ else:
         )
 
 
-
-
 # ══════════════════════════════════════════════════════════════════════════════
 # ── CHART 4: AUS PREDICTED PROBABILITIES ─────────────────────────────────────
 # ══════════════════════════════════════════════════════════════════════════════
 st.markdown("---")
-st.subheader("Chart 4 - Automated Underwriting Systems: Predicted Approval Probability")
+st.subheader("Chart 4 - Automated Underwriting Systems: Raw Approval Rates")
 st.markdown(f"""
-Average predicted probability of approval for **{focus_label}** applicants processed through 
-each automated underwriting system, ordered from lowest to highest.
+Raw approval rate for **{focus_label}** applicants processed through each automated 
+underwriting system, ordered from lowest to highest. This is the observed approval 
+percentage — not model-based.
 """)
 
 aus_cols = [c for c in ['aus-1', 'aus-2', 'aus-3', 'aus-4', 'aus-5'] if c in df.columns]
@@ -881,9 +976,9 @@ if not aus_cols:
 elif focus_df.empty:
     st.warning(f"No applications found for {focus_label}.")
 else:
-    # Melt AUS columns — include predicted_prob
-    aus_melted = focus_df[['unique_id', target_var, 'predicted_prob'] + aus_cols].melt(
-        id_vars=['unique_id', target_var, 'predicted_prob'],
+    # Melt AUS columns for focus group — raw outcome only
+    aus_melted = focus_df[[target_var] + aus_cols].melt(
+        id_vars=[target_var],
         value_vars=aus_cols,
         var_name='aus_col',
         value_name='aus_code'
@@ -897,23 +992,37 @@ else:
     if aus_melted.empty:
         st.warning("No valid AUS data found for this group.")
     else:
-        # Average predicted prob by AUS
+        from scipy import stats as scipy_stats
+
+        def aus_approval_rate_with_ci(x, alpha=0.05):
+            n  = len(x)
+            p  = x.mean()
+            z  = scipy_stats.norm.ppf(1 - alpha / 2)
+            se = np.sqrt(p * (1 - p) / n)
+            return pd.Series({
+                'approval_rate':  p,
+                'ci_lower':       max(0, p - z * se),
+                'ci_upper':       min(1, p + z * se),
+                'n_applications': n,
+            })
+
+        # Raw approval rates by AUS
         aus_stats = (
-            aus_melted.groupby('aus_code')['predicted_prob']
-            .agg(['mean', 'count'])
+            aus_melted.groupby('aus_code')[target_var]
+            .apply(aus_approval_rate_with_ci)
+            .unstack()
             .reset_index()
         )
-        aus_stats.columns = ['aus_code', 'pred_prob', 'n_applications']
         aus_stats['aus_name'] = aus_stats['aus_code'].map(aus_labels).fillna(aus_stats['aus_code'].astype(str))
         aus_stats = aus_stats[aus_stats['n_applications'] >= aus_min]
 
         if aus_stats.empty:
             st.warning(f"No AUS systems have at least {aus_min} applications from {focus_label}. Try lowering the minimum.")
         else:
-            # Comparison group AUS predicted probs
+            # Comparison group raw approval rates by AUS
             if show_comparison and not comp_df.empty:
-                aus_comp_melted = comp_df[['unique_id', target_var, 'predicted_prob'] + aus_cols].melt(
-                    id_vars=['unique_id', target_var, 'predicted_prob'],
+                aus_comp_melted = comp_df[[target_var] + aus_cols].melt(
+                    id_vars=[target_var],
                     value_vars=aus_cols,
                     var_name='aus_col',
                     value_name='aus_code'
@@ -925,66 +1034,92 @@ else:
                 aus_comp_melted['aus_code'] = aus_comp_melted['aus_code'].astype(int)
 
                 aus_comp_stats = (
-                    aus_comp_melted.groupby('aus_code')['predicted_prob']
-                    .agg(['mean', 'count'])
+                    aus_comp_melted.groupby('aus_code')[target_var]
+                    .apply(aus_approval_rate_with_ci)
+                    .unstack()
                     .reset_index()
                 )
-                aus_comp_stats.columns = ['aus_code', 'comp_pred_prob', 'comp_n']
-                aus_stats = aus_stats.merge(aus_comp_stats, on='aus_code', how='left')
+                aus_comp_stats = aus_comp_stats.rename(columns={
+                    'approval_rate':  'comp_approval_rate',
+                    'ci_lower':       'comp_ci_lower',
+                    'ci_upper':       'comp_ci_upper',
+                    'n_applications': 'comp_n',
+                })
+                aus_stats = aus_stats.merge(
+                    aus_comp_stats[['aus_code', 'comp_approval_rate', 'comp_ci_lower', 'comp_ci_upper', 'comp_n']],
+                    on='aus_code', how='left'
+                )
 
-            # Sort lowest to highest
-            aus_stats = aus_stats.sort_values('pred_prob', ascending=True)
+            aus_stats = aus_stats.sort_values('approval_rate', ascending=True)
 
-            ac1, ac2 = st.columns(2)
-            with ac1:
-                aus_width  = st.number_input("AUS chart width",  min_value=6, max_value=24, value=12, step=1, key="aw")
-            with ac2:
-                aus_height = st.number_input("AUS chart height", min_value=3, max_value=16,
-                                             value=max(4, int(len(aus_stats) * 0.8 + 1.5)), step=1, key="ah")
-
-         
             aus_height_px = max(250, len(aus_stats) * 60 + 100)
             fig4 = go.Figure()
+
             fig4.add_trace(go.Bar(
-                x=aus_stats['pred_prob'],
+                x=aus_stats['approval_rate'],
                 y=aus_stats['aus_name'],
                 orientation='h',
                 name=focus_label,
                 marker_color='#9b59b6',
+                error_x=dict(
+                    type='data',
+                    symmetric=False,
+                    array=(aus_stats['ci_upper'] - aus_stats['approval_rate']).clip(lower=0),
+                    arrayminus=(aus_stats['approval_rate'] - aus_stats['ci_lower']).clip(lower=0),
+                    color='rgba(0,0,0,0.4)',
+                    thickness=1.5,
+                    width=4,
+                ),
                 customdata=np.stack([
                     aus_stats['aus_name'],
-                    aus_stats['pred_prob'].apply(lambda x: f"{x:.1%}"),
+                    aus_stats['approval_rate'].apply(lambda x: f"{x:.1%}"),
                     aus_stats['n_applications'].astype(int),
+                    aus_stats['ci_lower'].apply(lambda x: f"{x:.1%}"),
+                    aus_stats['ci_upper'].apply(lambda x: f"{x:.1%}"),
                 ], axis=-1),
                 hovertemplate=(
                     "<b>%{customdata[0]}</b><br>"
                     f"Group: {focus_label}<br>"
-                    "Predicted Probability: %{customdata[1]}<br>"
+                    "Approval Rate: %{customdata[1]}<br>"
+                    "95% CI: %{customdata[3]} – %{customdata[4]}<br>"
                     "Applications: %{customdata[2]:,}<br>"
                     "<extra></extra>"
                 )
             ))
 
-            if show_comparison and 'comp_pred_prob' in aus_stats.columns:
+            
+            if show_comparison and 'comp_approval_rate' in aus_stats.columns:
                 aus_comp_n = aus_stats['comp_n'].astype(int) if 'comp_n' in aus_stats.columns else [0] * len(aus_stats)
-                aus_gap = aus_stats['comp_pred_prob'] - aus_stats['pred_prob']
+                aus_gap = aus_stats['comp_approval_rate'] - aus_stats['approval_rate']
                 fig4.add_trace(go.Scatter(
-                    x=aus_stats['comp_pred_prob'],
+                    x=aus_stats['comp_approval_rate'],
                     y=aus_stats['aus_name'],
                     mode='markers',
                     name=f"{comparison_label} (comparison)",
                     marker=dict(color='steelblue', size=14, symbol='diamond'),
+                    error_x=dict(
+                        type='data',
+                        symmetric=False,
+                        array=(aus_stats['comp_ci_upper'] - aus_stats['comp_approval_rate']).clip(lower=0),
+                        arrayminus=(aus_stats['comp_approval_rate'] - aus_stats['comp_ci_lower']).clip(lower=0),
+                        color='steelblue',
+                        thickness=1.5,
+                        width=4,
+                    ),
                     customdata=np.stack([
                         aus_stats['aus_name'],
-                        aus_stats['comp_pred_prob'].apply(lambda x: f"{x:.1%}" if pd.notna(x) else "N/A"),
+                        aus_stats['comp_approval_rate'].apply(lambda x: f"{x:.1%}" if pd.notna(x) else "N/A"),
                         aus_comp_n,
-                        aus_stats['pred_prob'].apply(lambda x: f"{x:.1%}"),
+                        aus_stats['approval_rate'].apply(lambda x: f"{x:.1%}"),
                         aus_gap.apply(lambda x: f"+{x:.1%}" if x > 0 else f"{x:.1%}"),
+                        aus_stats['comp_ci_lower'].apply(lambda x: f"{x:.1%}" if pd.notna(x) else "N/A"),
+                        aus_stats['comp_ci_upper'].apply(lambda x: f"{x:.1%}" if pd.notna(x) else "N/A"),
                     ], axis=-1),
                     hovertemplate=(
                         "<b>%{customdata[0]}</b><br>"
                         f"Group: {comparison_label}<br>"
-                        "Predicted Probability: %{customdata[1]}<br>"
+                        "Approval Rate: %{customdata[1]}<br>"
+                        "95% CI: %{customdata[5]} – %{customdata[6]}<br>"
                         "Applications: %{customdata[2]:,}<br>"
                         "───────────────<br>"
                         f"{focus_label}: %{{customdata[3]}}<br>"
@@ -993,128 +1128,67 @@ else:
                     )
                 ))
             
-            
 
-            fig4.add_vline(x=0.5, line_dash="dot", line_color="gray", opacity=0.5)
+            # if show_comparison and 'comp_approval_rate' in aus_stats.columns:
+            #     aus_comp_n = aus_stats['comp_n'].astype(int) if 'comp_n' in aus_stats.columns else [0] * len(aus_stats)
+            #     aus_gap = aus_stats['comp_approval_rate'] - aus_stats['approval_rate']
+            #     fig4.add_trace(go.Scatter(
+            #         x=aus_stats['comp_approval_rate'],
+            #         y=aus_stats['aus_name'],
+            #         mode='markers',
+            #         name=f"{comparison_label} (comparison)",
+            #         marker=dict(color='steelblue', size=14, symbol='diamond'),
+            #         customdata=np.stack([
+            #             aus_stats['aus_name'],
+            #             aus_stats['comp_approval_rate'].apply(lambda x: f"{x:.1%}" if pd.notna(x) else "N/A"),
+            #             aus_comp_n,
+            #             aus_stats['approval_rate'].apply(lambda x: f"{x:.1%}"),
+            #             aus_gap.apply(lambda x: f"+{x:.1%}" if x > 0 else f"{x:.1%}"),
+            #         ], axis=-1),
+            #         hovertemplate=(
+            #             "<b>%{customdata[0]}</b><br>"
+            #             f"Group: {comparison_label}<br>"
+            #             "Approval Rate: %{customdata[1]}<br>"
+            #             "Applications: %{customdata[2]:,}<br>"
+            #             "───────────────<br>"
+            #             f"{focus_label}: %{{customdata[3]}}<br>"
+            #             "Gap (baseline minus group): %{customdata[4]}<br>"
+            #             "<extra></extra>"
+            #         )
+            #     ))
+
             fig4.update_layout(
                 title=dict(
-                    text=f"AUS — Predicted Approval Probability for {focus_label}<br>"
-                         f"<sup>(minimum {aus_min} applications | ordered lowest to highest)</sup>",
-                    font=dict(size=14)
+                    text=f"AUS — Raw Approval Rate for {focus_label}<br>"
+                         f"<sup>(minimum {aus_min} applications | ordered lowest to highest | 95% CI shown)</sup>",
+                    font=dict(size=14, color="black")
                 ),
-                xaxis=dict(title="Average predicted probability of approval (lowest to highest)", tickformat=".0%", range=[0, 1.15]),
-                yaxis=dict(title=""),
+                xaxis=dict(title="Raw approval rate (% of applications approved)", tickformat=".0%", range=[0, 1.15],
+                           tickfont=dict(color="black"), title_font=dict(color="black")),
+                yaxis=dict(title="", tickfont=dict(color="black")),
                 height=aus_height_px,
-                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(color="black")),
                 hoverlabel=dict(bgcolor="#2c3e50", font_color="white", font_size=13, bordercolor="#2c3e50"),
                 bargap=0.3,
+                paper_bgcolor="white",
+                plot_bgcolor="white",
+                font=dict(color="black"),
             )
             st.plotly_chart(fig4, use_container_width=True)
-            
-            
-            
-            
+
             best_aus  = aus_stats.iloc[-1]
             worst_aus = aus_stats.iloc[0]
             st.markdown(f"""
-            **Highest predicted probability:** {best_aus['pred_prob']:.1%} — {best_aus['aus_name']} (n={int(best_aus['n_applications']):,})  
-            **Lowest predicted probability:** {worst_aus['pred_prob']:.1%} — {worst_aus['aus_name']} (n={int(worst_aus['n_applications']):,})
+            **Highest approval rate:** {best_aus['approval_rate']:.1%} — {best_aus['aus_name']} (n={int(best_aus['n_applications']):,})  
+            **Lowest approval rate:** {worst_aus['approval_rate']:.1%} — {worst_aus['aus_name']} (n={int(worst_aus['n_applications']):,})
             """)
 
-            aus_download = aus_stats[['aus_name', 'pred_prob', 'n_applications']].copy()
-            aus_download.columns = ['AUS System', 'Predicted Probability', 'Applications']
-            aus_download['Predicted Probability'] = aus_download['Predicted Probability'].apply(lambda x: f"{x:.1%}")
+            aus_download = aus_stats[['aus_name', 'approval_rate', 'n_applications']].copy()
+            aus_download.columns = ['AUS System', 'Approval Rate', 'Applications']
+            aus_download['Approval Rate'] = aus_download['Approval Rate'].apply(lambda x: f"{x:.1%}")
             st.download_button(
                 label="Download AUS data as CSV",
                 data=aus_download.to_csv(index=False),
-                file_name=f"aus_pred_prob_{focus_label.replace(' ', '_')}.csv",
+                file_name=f"aus_approval_rate_{focus_label.replace(' ', '_')}.csv",
                 mime="text/csv"
             )
-
-
-# ── Expanders ─────────────────────────────────────────────────────────────────
-st.markdown("---")
-with st.expander("How to read these charts"):
-    st.markdown("""
-    **Chart 1 - Odds Ratio:**  
-    Each dot shows approval odds for that group vs. the baseline after controlling for financial factors.  
-    A dot to the left means lower odds. Red = statistically significant (p < 0.05).
-
-    **Chart 2 - Probability:**  
-    Estimated approval probability for a hypothetical typical applicant with median financial 
-    characteristics. The dashed line is the baseline group's probability.
-
-    **Chart 3 - Lenders:**  
-    Average predicted probability of approval for the selected group's actual applications at each lender.  
-    These are model predictions — not raw approval rates — so financial differences between applicants 
-    are already accounted for. Blue diamonds show the baseline group's predicted probability at the 
-    same lender. Large gaps are worth investigating.
-
-    **Chart 4 - AUS:**  
-    Same as Chart 3 but broken down by automated underwriting system instead of lender.  
-    Ordered from lowest to highest predicted probability.
-    """)
-
-with st.expander("Approval rate vs. predicted probability — what's the difference?"):
-    st.markdown("""
-    **Approval rate** is a simple observed percentage — of all applications submitted, 
-    what fraction was actually approved? It includes all the variation in who applied 
-    (different incomes, debt levels, loan sizes).
-
-    **Predicted probability** is what the model estimates each individual application's 
-    approval chance to be, given the applicant's financial profile and demographic group. 
-    Averaging these predictions by lender or AUS tells you where the model predicts the 
-    lowest chances — with financial differences already baked in.
-
-    Charts 3 and 4 use predicted probabilities, not approval rates. This means the lender 
-    and AUS comparisons are already partially adjusted for financial differences in who applies.
-    """)
-
-with st.expander("What are Automated Underwriting Systems?"):
-    st.markdown("""
-    Automated Underwriting Systems (AUS) are software platforms lenders submit loan applications 
-    to for an automated risk assessment. The AUS returns a recommendation — typically "Approve/Eligible," 
-    "Refer," or "Refer with Caution" — that heavily influences whether the loan gets approved.
-
-    - **Desktop Underwriter (DU)** — owned by Fannie Mae, most widely used for conventional loans
-    - **Loan Product Advisor (LPA)** — owned by Freddie Mac, second most common for conventional loans
-    - **TOTAL Scorecard** — used for FHA loans
-    - **GUS** — used for USDA rural housing loans
-    - **Internal Proprietary System** — the lender's own in-house system
-
-    If one AUS consistently produces lower predicted approval probabilities for a demographic group 
-    compared to another, that raises questions about whether the algorithm itself may be producing 
-    disparate outcomes — a core concern in AI fairness research.
-    """)
-
-with st.expander("What is an LEI?"):
-    st.markdown("""
-    LEI stands for **Legal Entity Identifier** — a unique code assigned to every financial institution 
-    that reports HMDA data. If institution names aren't showing, the HMDA panel file 
-    (`2022_public_panel.csv`) isn't in the same folder as the app. Download it from 
-    **https://ffiec.cfpb.gov/data-browser/**.
-    """)
-
-with st.expander("What do the loan filters mean?"):
-    st.markdown("""
-    **Reverse mortgages** — older homeowners borrowing against home equity. Very different from regular mortgages.  
-    **HELOCs** — revolving credit secured by your home. More like a credit card.  
-    **Business or commercial loans** — loans for businesses, not individual homebuyers.  
-    **Single-family homes only** — excludes duplexes, apartment buildings, etc.  
-    **Home purchase only** — excludes refinancing and home improvement loans.  
-    **Primary residences only** — excludes second homes and investment properties.
-    """)
-
-with st.expander("Why does this matter?"):
-    st.markdown("""
-    Federal law — specifically the **Equal Credit Opportunity Act** — says lenders can't discriminate 
-    based on race, color, religion, national origin, sex, marital status, or age.
-
-    When one group consistently gets lower predicted approval probabilities, especially at specific 
-    lenders or through specific underwriting systems, that's the pattern regulators look for in 
-    fair lending investigations.
-
-    **This data is from 2020 to 2024, covers the Atlanta metro area, and comes from HMDA which is a federal database 
-    lenders are required to report to.**
-    """)
-
