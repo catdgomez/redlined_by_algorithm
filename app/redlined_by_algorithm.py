@@ -82,7 +82,7 @@ def load_data():
     # Get the directory where this app file lives
     app_dir = os.path.dirname(os.path.abspath(__file__))
     data_path = os.path.join(app_dir, "hmda_all_nf.csv.gz")
-    df = pd.read_csv(data_path)
+    df = pd.read_csv(data_path, low_memory=False)
     return df
 
 try:
