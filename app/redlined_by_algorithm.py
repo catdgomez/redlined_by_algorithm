@@ -75,7 +75,7 @@ with st.expander("What's the break down?"):
 # ── Read in the data ──────────────────────────────────────────────────────────
 @st.cache_data
 def load_data():
-    df = pd.read_csv("./app/hmda_all_nf.csv.gz")
+    df = pd.read_csv("hmda_all_nf.csv.gz")
     return df
 
 try:
