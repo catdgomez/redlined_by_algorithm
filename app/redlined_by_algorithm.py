@@ -56,19 +56,21 @@ This tool looks at real mortgage application data from Atlanta, GA across four l
 
 with st.expander("What's the break down?"):
     st.markdown("""
-    The **odds and probability charts** use a logistic regression model, controlling for financial 
-    factors like income and debt to income ratio, in order to isolate the effect of race, ethnicity, and age on approval outcomes.
-    
-    The **lender and AUS charts** take the model's predicted probability for every individual 
-    application and average those predictions by lender or underwriting system. This means the 
-    lender and AUS charts are also model-based, they show predicted probabilities, not raw 
-    approval rates, so financial differences between applicants are already baked in.
-    
-    **Approval rate** = raw percentage of applications approved without adjustments.  
+    **Charts 1 and 2** use a logistic regression model that controls for financial factors like 
+    income, debt-to-income ratio, loan-to-value ratio, and neighborhood racial composition. 
+    After holding those constant, what remains is the independent effect of race or ethnicity 
+    on approval outcomes. Chart 1 shows that effect as odds ratios. Chart 2 translates those 
+    odds into estimated approval probabilities for a typical applicant.
 
-    **Predicted probability** = what the model estimates each applicant's approval chance to be, 
-    given their financial profile and demographic group. Averaging these by lender or AUS tells 
-    you where the model predicts the lowest chances of approval.
+    **Charts 3 and 4** use raw observed data, no model, no financial controls. Chart 3 shows 
+    the actual percentage of applications approved at each lender by demographic group. Chart 4 
+    shows the same thing broken down by automated underwriting system. These charts tell you 
+    what happened in the real world, not what the model predicts after adjusting for finances.
+
+    The gap between what Charts 1 and 2 show and what Charts 3 and 4 show is meaningful. 
+    Charts 1 and 2 isolate race and ethnicity as an independent factor. Charts 3 and 4 show 
+    the real-world outcome that actual applicants experienced — financial differences and all. 
+    Both matter. One tells you discrimination exists. The other tells you where.
     """)
 
 
