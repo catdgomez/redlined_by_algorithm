@@ -25,7 +25,7 @@ st.title("Redlined by Algorithm")
 st.subheader("Does race, ethnicity, or age affect your chances of getting a mortgage in Atlanta?")
 with st.expander("Why are we here?"):
     st.markdown("""
-    This tool looks at real mortgage application data from Atlanta, GA to explore a simple question:
+    This tool looks at real mortgage application data from Atlanta, GA from 2020-2024 to explore a simple question:
 
     **After accounting for financial factors like income and debt, does a person's race, ethnicity, 
     or age still affect whether their mortgage application gets approved?**
@@ -69,7 +69,7 @@ with st.expander("What's the break down?"):
 
     The gap between what Charts 1 and 2 show and what Charts 3 and 4 show is meaningful. 
     Charts 1 and 2 isolate race and ethnicity as an independent factor. Charts 3 and 4 show 
-    the real-world outcome that actual applicants experienced — financial differences and all. 
+    the real-world outcome that actual applicants experienced, financial differences and all. 
     Both matter. One tells you discrimination exists. The other tells you where.
     """)
 
